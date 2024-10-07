@@ -75,6 +75,16 @@ def _update_model_kwargs_for_generation(
             ).to(past_positions.device)
             model_kwargs["cache_position"] = torch.cat((past_positions, new_positions))
 
+            last_pos_ids = model_kwargs["position_ids"][:, -1:]
+            model_kwargs["position_ids"] = torch.cat([
+                model_kwargs["position_ids"], 
+                torch.where(
+                    last_pos_ids < model_kwargs["original_seq_len"], 
+                    model_kwargs["original_seq_len"], 
+                    last_pos_ids + 1
+                )
+            ], dim=-1)
+
         return model_kwargs
 
 

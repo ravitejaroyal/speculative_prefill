@@ -7,8 +7,8 @@ class LlamaSpecPrefillConfig(LlamaConfig):
     
     def __init__(
         self, 
-        keep_token_cnt: int = -1, 
+        keep_token: float = -1, 
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.keep_token_cnt = keep_token_cnt
+        self.keep_token = keep_token

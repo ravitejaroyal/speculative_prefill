@@ -5,23 +5,8 @@ from transformers import (AutoModelForCausalLM, AutoTokenizer,
 from models.monkey_patch_llama import monkey_patch_llama
 from models.speculative_prefill import build_speculative_prefill_model
 
-# input_text = """
-# Summarize the following text with a few words: 
-
-# As the Nameless officially do not exist, the upper echelons of the Gallian Army exploit 
-# the concept of plausible deniability in order to send them on missions that would otherwise 
-# make Gallia lose face in the war . While at times this works to their advantage , such as a 
-# successful incursion into Imperial territory , other orders cause certain members of the 422nd 
-# great distress . One such member , Gusurg , becomes so enraged that he abandons his post and defects 
-# into the ranks of Calamity Raven , attached to the ideal of Darcsen independence proposed by their 
-# leader , Dahau . At the same time , elements within Gallian Army Command move to erase the 
-# Nameless in order to protect their own interests . Hounded by both allies and enemies, 
-# and combined with the presence of a traitor within their ranks, 
-# the 422nd desperately move to keep themselves alive while at the same time 
-# fight to help the Gallian war effort. """
-
 input_text = """
-Summarize the following text with a few words: 
+Summarize the following text with a one sentence: 
 
 Sven Magnus Øen Carlsen[a] (born 30 November 1990) is a Norwegian chess grandmaster. Carlsen is a five-time World Chess Champion, the reigning five-time World Rapid Chess Champion, the reigning seven-time World Blitz Chess Champion, and the reigning Chess World Cup Champion. He has held the No. 1 position in the FIDE world chess rankings since 1 July 2011 and trails only Garry Kasparov in time spent as the highest-rated player in the world.[1] His peak rating of 2882 is the highest in history. He also holds the record for the longest unbeaten streak at an elite level in classical chess at 125 games.[2][3]
 
@@ -37,15 +22,14 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 messages = [{'role': 'user', 'content': input_text}]
 
 prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-prompt = "Answer: "
-
+# prompt += "Answer: "
 inputs = tokenizer([prompt], return_tensors="pt")
 
 input_ids = inputs['input_ids'].to('cuda')
 attention_mask = inputs['attention_mask'].to('cuda')
 
 # get keep indices
-spec_prefill_model = build_speculative_prefill_model(keep_token_cnt=50)
+spec_prefill_model = build_speculative_prefill_model(keep_token=0.5)
 
 spec_prefill_data = spec_prefill_model.speculative_prefill(
     input_ids=input_ids, 
@@ -74,6 +58,7 @@ gen_config = GenerationConfig(
     eos_token_id=128009, 
     pad_token_id=128009
 )
+
 outputs = model.generate(
     **spec_prefill_inputs, 
     max_new_tokens=100, 

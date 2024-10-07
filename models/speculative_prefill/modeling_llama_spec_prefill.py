@@ -93,7 +93,13 @@ class LlamaSpecPrefillAttention(LlamaAttention):
         seq_len = attn_weights.shape[-1]
 
         # max over heads
-        keep_token_cnt = min(seq_len, self.config.keep_token_cnt)
+        if self.config.keep_token == -1:
+            keep_token_cnt = seq_len
+        elif 0.0 < self.config.keep_token < 1.0:
+            keep_token_cnt = math.ceil(seq_len * self.config.keep_token)
+        else:
+            keep_token_cnt = min(seq_len, self.config.keep_token)
+        
         attn_weights_max = torch.max(attn_weights, dim=1, keepdim=True)[0]
         _, keep_indices = torch.topk(attn_weights_max, dim=-1, k=keep_token_cnt)
 
