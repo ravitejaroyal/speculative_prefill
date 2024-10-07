@@ -36,6 +36,7 @@ class LlamaSpecPrefillAttention(LlamaAttention):
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.45
+        look_back_cnt: Optional[int] = None, 
         **kwargs,
     ) -> SpeculativePrefillData:
         bsz, q_len, _ = hidden_states.size()
@@ -88,9 +89,18 @@ class LlamaSpecPrefillAttention(LlamaAttention):
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
             attn_weights = attn_weights + causal_mask
         
-        # we take the last token's attn for prediction
-        attn_weights = attn_weights[..., -1, :]
-        seq_len = attn_weights.shape[-1]
+        if look_back_cnt is not None:
+            # we use the last look_back_cnt's aggregated results
+            attn_weights = attn_weights[..., -look_back_cnt, :] # [B, H, look_back_cnt, K]
+            seq_len = attn_weights.shape[-1] - look_back_cnt
+
+            # max over all the tokens
+            attn_weights = torch.mean(attn_weights, dim=-2, keepdim=True) # [B, H, 1, K]
+            attn_weights = attn_weights[..., :-look_back_cnt]
+        else:
+            # we take the last token's attn for prediction
+            attn_weights = attn_weights[..., -1, :] # [B, H, 1, K]
+            seq_len = attn_weights.shape[-1]
 
         # max over heads
         if self.config.keep_token == -1:
@@ -126,6 +136,7 @@ class LlamaSpecPrefillDecoderLayer(LlamaDecoderLayer):
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.45
+        look_back_cnt: Optional[int] = None, 
         **kwargs,
     ) -> SpeculativePrefillData:
         
@@ -134,7 +145,8 @@ class LlamaSpecPrefillDecoderLayer(LlamaDecoderLayer):
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
-            position_embeddings=position_embeddings,
+            position_embeddings=position_embeddings, 
+            look_back_cnt=look_back_cnt, 
             **kwargs,
         )
 
@@ -164,6 +176,7 @@ class LlamaSpecPrefillModel(LlamaModel):
         input_ids: torch.LongTensor,
         position_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None, 
+        look_back_cnt: Optional[int] = None, 
         **kwargs
     ) -> SpeculativePrefillData:
         inputs_embeds = self.embed_tokens(input_ids)
@@ -185,6 +198,7 @@ class LlamaSpecPrefillModel(LlamaModel):
             attention_mask=causal_mask, 
             position_ids=position_ids, 
             position_embeddings=position_embeddings, 
+            look_back_cnt=look_back_cnt, 
             **kwargs
         )
 
@@ -192,7 +206,8 @@ class LlamaSpecPrefillModel(LlamaModel):
         self, 
         spec_prefill_data: SpeculativePrefillData, 
         input_ids: torch.LongTensor, 
-        attention_mask: Optional[torch.Tensor] = None
+        attention_mask: Optional[torch.Tensor] = None, 
+        look_back_cnt: Optional[int] = None
     ) -> Dict[str, torch.Tensor]:
         B, S = input_ids.shape
         device = input_ids.device
@@ -206,6 +221,9 @@ class LlamaSpecPrefillModel(LlamaModel):
         if attention_mask is not None:
             attention_mask = attention_mask.to(device).gather(-1, keep_indices)
         
+        if look_back_cnt is not None:
+            S -= look_back_cnt
+
         return {
             'input_ids': input_ids, 
             'position_ids': position_ids, 

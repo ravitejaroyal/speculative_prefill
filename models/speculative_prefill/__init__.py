@@ -38,5 +38,3 @@ def build_speculative_prefill_model(**kwargs) -> LlamaSpecPrefillModel:
         attn_implementation="flash_attention_2", 
         trust_remote_code=True
     )
-
-

@@ -149,7 +149,6 @@ def _validate_model_kwargs(self, model_kwargs: Dict[str, Any]):
             )
 
 
-
 def monkey_patch_llama():
     LlamaForCausalLM._validate_model_kwargs = _validate_model_kwargs
     LlamaForCausalLM._update_model_kwargs_for_generation = _update_model_kwargs_for_generation
