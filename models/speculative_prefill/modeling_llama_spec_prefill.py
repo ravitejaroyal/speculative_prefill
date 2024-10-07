@@ -203,5 +203,6 @@ class LlamaSpecPrefillModel(LlamaModel):
         return {
             'input_ids': input_ids, 
             'position_ids': position_ids, 
-            'attention_mask': attention_mask
+            'attention_mask': attention_mask, 
+            'original_seq_len': S
         }
