@@ -3,7 +3,8 @@ from transformers import (AutoModelForCausalLM, AutoTokenizer,
                           GenerationConfig, LlamaForCausalLM)
 
 from models.monkey_patch_llama import monkey_patch_llama
-from models.speculative_prefill import build_speculative_prefill_model
+from models.speculative_prefill import (speculative_prefill,
+                                        speculative_prefill_data_to_inputs)
 
 input_text = """
 Summarize the following text with a few sentences: 
@@ -44,27 +45,17 @@ inputs = tokenizer([prompt], return_tensors="pt")
 input_ids = inputs['input_ids'].to('cuda')
 attention_mask = inputs['attention_mask'].to('cuda')
 
-guide_text = "Here's response: "
-guide_text_inputs = tokenizer([guide_text], return_tensors="pt")
-look_back_cnt = guide_text_inputs['input_ids'].shape[1]
-
-input_ids = torch.cat([input_ids, guide_text_inputs['input_ids'].to('cuda')], dim=-1)
-attention_mask = torch.cat([attention_mask, guide_text_inputs['attention_mask'].to('cuda')], dim=-1)
-
-# get keep indices
-spec_prefill_model = build_speculative_prefill_model(keep_token=0.3)
-
-spec_prefill_data = spec_prefill_model.speculative_prefill(
+spec_prefill_data = speculative_prefill(
     input_ids=input_ids, 
     attention_mask=attention_mask, 
-    look_back_cnt=look_back_cnt
+    decode_cnt=8, 
+    keep=0.5
 )
 
-spec_prefill_inputs = spec_prefill_model.speculative_prefill_data_to_inputs(
+spec_prefill_inputs = speculative_prefill_data_to_inputs(
     spec_prefill_data=spec_prefill_data, 
     input_ids=input_ids, 
-    attention_mask=attention_mask, 
-    look_back_cnt=look_back_cnt
+    attention_mask=attention_mask
 )
 
 monkey_patch_llama()
@@ -86,7 +77,7 @@ gen_config = GenerationConfig(
 
 outputs = model.generate(
     **spec_prefill_inputs, 
-    max_new_tokens=100, 
+    max_new_tokens=500, 
     use_cache=True, 
     return_dict_in_generate=True, 
     output_scores=True, 
