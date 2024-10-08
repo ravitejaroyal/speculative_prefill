@@ -3,11 +3,12 @@ from transformers import (AutoModelForCausalLM, AutoTokenizer,
                           GenerationConfig, LlamaForCausalLM)
 
 from models.monkey_patch_llama import monkey_patch_llama
-from models.speculative_prefill import (speculative_prefill,
-                                        speculative_prefill_data_to_inputs)
+from models.speculative_prefill import (prepare_speculator,
+                                        spec_prefill_data_to_inputs,
+                                        speculate_tokens)
 
 input_text = """
-Summarize the following text with a few sentences: 
+Summarize the following text with a one sentence: 
 
 Upon the death of Lord Jon Arryn, the principal advisor to King Robert Baratheon, Robert recruits his childhood friend Eddard "Ned" Stark, now Warden of the North, to replace Arryn as Hand of the King, and to betroth his daughter Sansa to Robert's son Joffrey. Ned accepts the position when he learns that Arryn's widow Lysa believes he was poisoned by Robert's wife Queen Cersei Lannister and her family. Shortly thereafter, Ned's son Bran discovers Cersei having sex with her twin brother Jaime Lannister, who throws Bran from the tower to conceal their affair, leaving him comatose and paralyzing his legs.
 
@@ -45,14 +46,17 @@ inputs = tokenizer([prompt], return_tensors="pt")
 input_ids = inputs['input_ids'].to('cuda')
 attention_mask = inputs['attention_mask'].to('cuda')
 
-spec_prefill_data = speculative_prefill(
+speculator = prepare_speculator()
+
+spec_prefill_data = speculate_tokens(
+    speculator=speculator, 
     input_ids=input_ids, 
     attention_mask=attention_mask, 
     decode_cnt=8, 
-    keep=0.5
+    keep=0.3
 )
 
-spec_prefill_inputs = speculative_prefill_data_to_inputs(
+spec_prefill_inputs = spec_prefill_data_to_inputs(
     spec_prefill_data=spec_prefill_data, 
     input_ids=input_ids, 
     attention_mask=attention_mask

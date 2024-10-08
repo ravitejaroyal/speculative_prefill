@@ -25,13 +25,8 @@ class SpeculativePrefillData:
     keep_indices: Optional[torch.Tensor] = None
 
 
-def speculative_prefill(
-    input_ids: torch.Tensor, 
-    attention_mask: torch.Tensor, 
-    decode_cnt: int = 8, 
-    keep: float = -1
-) -> SpeculativePrefillData:
-    model: LlamaForCausalLM = AutoModelForCausalLM.from_pretrained(
+def prepare_speculator() -> LlamaForCausalLM:
+    return AutoModelForCausalLM.from_pretrained(
         'meta-llama/Llama-3.2-1B-Instruct', 
         torch_dtype=torch.bfloat16, 
         low_cpu_mem_usage=True, 
@@ -40,13 +35,22 @@ def speculative_prefill(
         trust_remote_code=True
     )
 
+
+def speculate_tokens(
+    speculator: LlamaForCausalLM, 
+    input_ids: torch.Tensor, 
+    attention_mask: torch.Tensor, 
+    decode_cnt: int = 8, 
+    keep: float = -1
+) -> SpeculativePrefillData:
+
     gen_config = GenerationConfig(
         do_sample=False, 
         eos_token_id=128009, 
         pad_token_id=128009
     )
 
-    outputs = model.generate(
+    outputs = speculator.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,  
         max_new_tokens=decode_cnt, 
@@ -90,7 +94,7 @@ def speculative_prefill(
     return SpeculativePrefillData(keep_indices=keep_indices)
 
 
-def speculative_prefill_data_to_inputs(
+def spec_prefill_data_to_inputs(
     spec_prefill_data: SpeculativePrefillData, 
     input_ids: torch.LongTensor, 
     attention_mask: Optional[torch.Tensor] = None, 
