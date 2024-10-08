@@ -2,10 +2,9 @@ import torch
 from transformers import (AutoModelForCausalLM, AutoTokenizer,
                           GenerationConfig, LlamaForCausalLM)
 
-from models.monkey_patch_llama import monkey_patch_llama
-from models.speculative_prefill import (prepare_speculator,
-                                        spec_prefill_data_to_inputs,
-                                        speculate_tokens)
+from models.llama.monkey_patch_llama import monkey_patch_llama
+from models.speculator import (prepare_speculator, spec_prefill_data_to_inputs,
+                               speculate_tokens)
 
 input_text = """
 Summarize the following text with a one sentence: 
