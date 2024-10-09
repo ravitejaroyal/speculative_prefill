@@ -1,10 +1,8 @@
 import torch
-from transformers import (AutoModelForCausalLM, AutoTokenizer,
-                          GenerationConfig, LlamaForCausalLM)
+from networkx import general_random_intersection_graph
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from models.llama.monkey_patch_llama import monkey_patch_llama
-from models.speculator import (prepare_speculator, spec_prefill_data_to_inputs,
-                               speculate_tokens)
 
 input_text = """
 Summarize the following text with a one sentence: 
@@ -45,25 +43,9 @@ inputs = tokenizer([prompt], return_tensors="pt")
 input_ids = inputs['input_ids'].to('cuda')
 attention_mask = inputs['attention_mask'].to('cuda')
 
-speculator = prepare_speculator()
-
-spec_prefill_data = speculate_tokens(
-    speculator=speculator, 
-    input_ids=input_ids, 
-    attention_mask=attention_mask, 
-    decode_cnt=8, 
-    keep=0.3
-)
-
-spec_prefill_inputs = spec_prefill_data_to_inputs(
-    spec_prefill_data=spec_prefill_data, 
-    input_ids=input_ids, 
-    attention_mask=attention_mask
-)
-
 monkey_patch_llama()
 
-model: LlamaForCausalLM = AutoModelForCausalLM.from_pretrained(
+model = AutoModelForCausalLM.from_pretrained(
     model_name, 
     trust_remote_code=True, 
     torch_dtype=torch.bfloat16, 
@@ -74,12 +56,13 @@ model: LlamaForCausalLM = AutoModelForCausalLM.from_pretrained(
 
 gen_config = GenerationConfig(
     do_sample=False, 
-    eos_token_id=128009, 
-    pad_token_id=128009
+    # eos_token_id=128009, 
+    # pad_token_id=128009
 )
 
 outputs = model.generate(
-    **spec_prefill_inputs, 
+    input_ids=input_ids,
+    attention_mask=attention_mask,  
     max_new_tokens=500, 
     use_cache=True, 
     return_dict_in_generate=True, 
@@ -88,7 +71,7 @@ outputs = model.generate(
 )
 
 print ("=====================")
-input_length = spec_prefill_inputs["input_ids"].shape[1]
+input_length = inputs["input_ids"].shape[1]
 generated_tokens = outputs.sequences[:, input_length:]
 print (generated_tokens.tolist())
 print (tokenizer.decode(generated_tokens.tolist()[0]))

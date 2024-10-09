@@ -25,12 +25,12 @@ class SpeculativePrefillData:
     keep_indices: Optional[torch.Tensor] = None
 
 
-def prepare_speculator() -> LlamaForCausalLM:
+def build_speculator(device: Optional[torch.device] = None) -> LlamaForCausalLM:
     return AutoModelForCausalLM.from_pretrained(
         'meta-llama/Llama-3.2-1B-Instruct', 
         torch_dtype=torch.bfloat16, 
         low_cpu_mem_usage=True, 
-        device_map="cuda", 
+        device_map=device, 
         attn_implementation="eager", # eager is required to output attn scores
         trust_remote_code=True
     )
@@ -39,7 +39,7 @@ def prepare_speculator() -> LlamaForCausalLM:
 def speculate_tokens(
     speculator: LlamaForCausalLM, 
     input_ids: torch.Tensor, 
-    attention_mask: torch.Tensor, 
+    attention_mask: Optional[torch.Tensor] = None, 
     decode_cnt: int = 8, 
     keep: float = -1, 
     gen_config: Optional[GenerationConfig] = None

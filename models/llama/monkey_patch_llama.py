@@ -13,12 +13,22 @@
 """
 
 import inspect
-from typing import Any, Dict
+import os
+from functools import partial
+from types import MethodType
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import torch
-from transformers import LlamaForCausalLM
+from transformers import (GenerationConfig, LlamaForCausalLM, PretrainedConfig,
+                          PreTrainedModel)
 from transformers.cache_utils import Cache
-from transformers.generation.utils import ModelOutput
+from transformers.generation.logits_process import LogitsProcessorList
+from transformers.generation.stopping_criteria import StoppingCriteriaList
+from transformers.generation.streamers import BaseStreamer
+from transformers.generation.utils import GenerateOutput, ModelOutput
+
+from models.speculator import (build_speculator, spec_prefill_data_to_inputs,
+                               speculate_tokens)
 
 
 def _update_model_kwargs_for_generation(
@@ -149,6 +159,129 @@ def _validate_model_kwargs(self, model_kwargs: Dict[str, Any]):
             )
 
 
+def generate(
+    self,
+    inputs: Optional[torch.Tensor] = None,
+    generation_config: Optional[GenerationConfig] = None,
+    logits_processor: Optional[LogitsProcessorList] = None,
+    stopping_criteria: Optional[StoppingCriteriaList] = None,
+    prefix_allowed_tokens_fn: Optional[Callable[[int, torch.Tensor], List[int]]] = None,
+    synced_gpus: Optional[bool] = None,
+    assistant_model: Optional["PreTrainedModel"] = None,
+    streamer: Optional["BaseStreamer"] = None,
+    negative_prompt_ids: Optional[torch.Tensor] = None,
+    negative_prompt_attention_mask: Optional[torch.Tensor] = None,
+    **kwargs,
+) -> Union[GenerateOutput, torch.LongTensor]:
+    speculator = getattr(self, "speculator")
+    main_generate = getattr(self, "_generate")
+
+    assert speculator is not None, "Missing speculator"
+    assert main_generate is not None, "Missing original generation"
+
+    input_ids = kwargs.pop("input_ids", None)
+    attention_mask = kwargs.pop("attention_mask", None)
+    decode_cnt=kwargs.pop("decode_cnt", 8)
+    keep=kwargs.pop("keep", 0.3)
+
+    assert input_ids.shape[0] == 1, "Currently only allowing batch size = 1"
+
+    spec_prefill_data = speculate_tokens(
+        speculator=speculator, 
+        input_ids=input_ids, 
+        attention_mask=attention_mask, 
+        decode_cnt=decode_cnt, 
+        keep=keep
+    )
+
+    spec_prefill_inputs = spec_prefill_data_to_inputs(
+        spec_prefill_data=spec_prefill_data, 
+        input_ids=input_ids, 
+        attention_mask=attention_mask
+    )
+
+    outputs = main_generate(
+        **spec_prefill_inputs, 
+        inputs=inputs,
+        generation_config=generation_config,
+        logits_processor=logits_processor,
+        stopping_criteria=stopping_criteria,
+        prefix_allowed_tokens_fn=prefix_allowed_tokens_fn,
+        synced_gpus=synced_gpus,
+        assistant_model=assistant_model,
+        streamer=streamer,
+        negative_prompt_ids=negative_prompt_ids,
+        negative_prompt_attention_mask=negative_prompt_attention_mask,
+        **kwargs,
+    )
+
+    # reconstruct the sequences
+    # TODO: things other than sequences might not work
+    shrinked_input_len = spec_prefill_inputs["input_ids"].shape[1]
+
+    if isinstance(outputs, torch.Tensor):
+        generated_tokens = outputs[:, shrinked_input_len:]
+        outputs = torch.concatenate(
+            [input_ids, generated_tokens], dim=-1
+        )
+    else:
+        generated_tokens = outputs.sequences[:, shrinked_input_len:]
+        outputs.sequences = torch.concatenate(
+            [input_ids, generated_tokens], dim=-1
+        )
+
+    return outputs
+
+
+def from_pretrained(
+    cls,
+    pretrained_model_name_or_path: Optional[Union[str, os.PathLike]],
+    *model_args,
+    config: Optional[Union[PretrainedConfig, str, os.PathLike]] = None,
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    ignore_mismatched_sizes: bool = False,
+    force_download: bool = False,
+    local_files_only: bool = False,
+    token: Optional[Union[str, bool]] = None,
+    revision: str = "main",
+    use_safetensors: bool = None,
+    **kwargs,
+) -> PreTrainedModel:
+    original_from_pretrained = kwargs.pop("original_from_pretrained", None)
+    assert original_from_pretrained is not None
+
+    model: LlamaForCausalLM = original_from_pretrained(
+        pretrained_model_name_or_path=pretrained_model_name_or_path, 
+        *model_args, 
+        config=config, 
+        cache_dir=cache_dir, 
+        ignore_mismatched_sizes=ignore_mismatched_sizes, 
+        force_download=force_download, 
+        local_files_only=local_files_only, 
+        token=token, 
+        revision=revision, 
+        use_safetensors=use_safetensors, 
+        **kwargs
+    )
+
+    # restore back the original from pretrained method
+    LlamaForCausalLM.from_pretrained = original_from_pretrained
+    model.speculator = build_speculator(device=model.device)
+
+    # monkey patch on overriding behaviors
+    model._validate_model_kwargs = MethodType(_validate_model_kwargs, model)
+    model._update_model_kwargs_for_generation = MethodType(_update_model_kwargs_for_generation, model)
+    
+    # monkey patch on modifying behaviors
+    model._generate = model.generate
+    model.generate = MethodType(torch.no_grad(generate), model)
+
+    return model
+
+
 def monkey_patch_llama():
-    LlamaForCausalLM._validate_model_kwargs = _validate_model_kwargs
-    LlamaForCausalLM._update_model_kwargs_for_generation = _update_model_kwargs_for_generation
+    original_from_pretrained = LlamaForCausalLM.from_pretrained
+    LlamaForCausalLM.from_pretrained = classmethod(partial(
+        from_pretrained, 
+        original_from_pretrained=original_from_pretrained
+    ))
