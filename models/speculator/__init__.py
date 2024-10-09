@@ -41,14 +41,16 @@ def speculate_tokens(
     input_ids: torch.Tensor, 
     attention_mask: torch.Tensor, 
     decode_cnt: int = 8, 
-    keep: float = -1
+    keep: float = -1, 
+    gen_config: Optional[GenerationConfig] = None
 ) -> SpeculativePrefillData:
 
-    gen_config = GenerationConfig(
-        do_sample=False, 
-        eos_token_id=128009, 
-        pad_token_id=128009
-    )
+    if gen_config is None:
+        gen_config = GenerationConfig(
+            do_sample=False, 
+            eos_token_id=128009, 
+            pad_token_id=128009
+        )
 
     outputs = speculator.generate(
         input_ids=input_ids,
