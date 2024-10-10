@@ -200,9 +200,18 @@ def generate(
         attention_mask=attention_mask
     )
 
+    shrinked_input_len = spec_prefill_inputs["input_ids"].shape[1]
+
     # get rid of warning
     if "max_new_tokens" in kwargs:
         kwargs.pop("max_length", None)
+
+    if "max_length" in kwargs:
+        original_max_length = kwargs["max_length"]
+        original_seq_len = input_ids.shape[-1]
+        max_gen_len = original_max_length - original_seq_len
+        new_max_length = shrinked_input_len + max_gen_len
+        kwargs["max_length"] = new_max_length
 
     outputs = main_generate(
         **spec_prefill_inputs, 
@@ -221,8 +230,6 @@ def generate(
 
     # reconstruct the sequences
     # TODO: things other than sequences might not work
-    shrinked_input_len = spec_prefill_inputs["input_ids"].shape[1]
-
     if isinstance(outputs, torch.Tensor):
         generated_tokens = outputs[:, shrinked_input_len:]
         outputs = torch.concatenate(
