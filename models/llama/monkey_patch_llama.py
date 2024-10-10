@@ -200,6 +200,10 @@ def generate(
         attention_mask=attention_mask
     )
 
+    # get rid of warning
+    if "max_new_tokens" in kwargs:
+        kwargs.pop("max_length", None)
+
     outputs = main_generate(
         **spec_prefill_inputs, 
         inputs=inputs,
