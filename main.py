@@ -1,5 +1,4 @@
 import torch
-from networkx import general_random_intersection_graph
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from models.llama.monkey_patch_llama import monkey_patch_llama
@@ -56,7 +55,7 @@ model = AutoModelForCausalLM.from_pretrained(
 
 gen_config = GenerationConfig(
     do_sample=False, 
-    # eos_token_id=128009, 
+    eos_token_id=128009, 
     # pad_token_id=128009
 )
 
