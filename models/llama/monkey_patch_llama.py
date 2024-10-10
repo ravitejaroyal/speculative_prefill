@@ -181,7 +181,7 @@ def generate(
 
     input_ids = kwargs.pop("input_ids", None)
     attention_mask = kwargs.pop("attention_mask", None)
-    decode_cnt=kwargs.pop("decode_cnt", 8)
+    look_ahead_cnt=kwargs.pop("look_ahead_cnt", 8)
     keep=kwargs.pop("keep", 0.3)
 
     assert input_ids.shape[0] == 1, "Currently only allowing batch size = 1"
@@ -190,7 +190,7 @@ def generate(
         speculator=speculator, 
         input_ids=input_ids, 
         attention_mask=attention_mask, 
-        decode_cnt=decode_cnt, 
+        look_ahead_cnt=look_ahead_cnt, 
         keep=keep
     )
 

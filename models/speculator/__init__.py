@@ -40,7 +40,7 @@ def speculate_tokens(
     speculator: LlamaForCausalLM, 
     input_ids: torch.Tensor, 
     attention_mask: Optional[torch.Tensor] = None, 
-    decode_cnt: int = 8, 
+    look_ahead_cnt: int = 8, 
     keep: float = -1, 
     gen_config: Optional[GenerationConfig] = None
 ) -> SpeculativePrefillData:
@@ -55,7 +55,7 @@ def speculate_tokens(
     outputs = speculator.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,  
-        max_new_tokens=decode_cnt, 
+        max_new_tokens=look_ahead_cnt, 
         use_cache=True, 
         return_dict_in_generate=True, 
         output_attentions=True, 
@@ -83,7 +83,13 @@ def speculate_tokens(
     # [B, prefill_len]
     all_attns = torch.max(torch.stack(all_attns, dim=0), dim=0)[0]
 
-    if keep == -1:
+    if keep == -2:
+        # TODO: later refactor
+        max_attns = torch.max(all_attns, dim=-1, keepdim=True)[0]
+        threshold = max_attns * 0.01
+        # sum to get number of tokens, max over batch
+        topk = (all_attns > threshold).sum(-1).max(0)[0]
+    elif keep == -1:
         topk = prefill_len
     elif 0.0 < keep < 1.0:
         topk = math.ceil(prefill_len * keep)
