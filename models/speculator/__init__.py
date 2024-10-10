@@ -68,14 +68,13 @@ def speculate_tokens(
 
     all_attns = []
 
-    # we start from the second one as the first one is the prefill stage
-    for pos in range(1, len(attentions)):
+    for pos in range(len(attentions)):
         # Tuple[B, H, Q, K]
         attn = attentions[pos]
         # [layer_cnt, B, H, Q, K]
         attn = torch.stack(attn, dim=0)
         # [layer_cn, B, 1, prefill_len]
-        attn = attn.max(dim=2)[0][..., :prefill_len]
+        attn = attn.max(dim=2)[0][..., -1:, :prefill_len]
         # [B, prefill_len]
         attn = attn.mean(dim=0).squeeze(1)
         # aggregate
