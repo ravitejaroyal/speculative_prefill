@@ -227,7 +227,7 @@ def speculate_tokens(
         # adaptive strategy based on quantile * ratio
         # this will remove the influence of the max outliers (e.g. sink tokens)
         quantile = torch.quantile(all_attns.float(), q=0.98, dim=-1, keepdim=True)
-        threshold = quantile * 0.005
+        threshold = quantile * 0.01
         # sum to get number of tokens, max over batch
         topk = (all_attns > threshold).sum(-1).max(0)[0]
     elif keep == -2:
@@ -246,7 +246,7 @@ def speculate_tokens(
         # absolute count strategy
         topk = min(prefill_len, keep)
 
-    if VERBOSITY == 1:
+    if VERBOSITY >= 1:
         print(f"Keep strategy = {keep}, Kept token percentage = {(topk / prefill_len) * 100:.2f}%, Look ahead cnt = {look_ahead_cnt}.")
 
     _, keep_indices = torch.topk(all_attns, dim=-1, k=topk)

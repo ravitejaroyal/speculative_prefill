@@ -14,6 +14,7 @@
 
 import inspect
 import os
+import time
 from functools import partial
 from types import MethodType
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -27,7 +28,7 @@ from transformers.generation.stopping_criteria import StoppingCriteriaList
 from transformers.generation.streamers import BaseStreamer
 from transformers.generation.utils import GenerateOutput, ModelOutput
 
-from models import KEEP, LOOK_AHEAD_CNT
+from models import KEEP, LOOK_AHEAD_CNT, VERBOSITY
 from models.speculator import (build_speculator, spec_prefill_data_to_inputs,
                                speculate_tokens)
 
@@ -187,6 +188,10 @@ def generate(
 
     assert input_ids.shape[0] == 1, "Currently only allowing batch size = 1"
 
+    if VERBOSITY >= 2:
+        torch.cuda.synchronize()
+        start_time = time.time()
+
     spec_prefill_data = speculate_tokens(
         speculator=speculator, 
         input_ids=input_ids, 
@@ -200,6 +205,10 @@ def generate(
         input_ids=input_ids, 
         attention_mask=attention_mask
     )
+
+    if VERBOSITY >= 2:
+        torch.cuda.synchronize()
+        finish_spec = time.time()
 
     shrinked_input_len = spec_prefill_inputs["input_ids"].shape[1]
 
@@ -228,6 +237,11 @@ def generate(
         negative_prompt_attention_mask=negative_prompt_attention_mask,
         **kwargs,
     )
+
+    if VERBOSITY >= 2:
+        torch.cuda.synchronize()
+        finish_gen = time.time()
+        print(f"Speculator: {(finish_spec - start_time):.2f}s, Main model: {(finish_gen - finish_spec):.2f}s.")
 
     # reconstruct the sequences
     # TODO: things other than sequences might not work
