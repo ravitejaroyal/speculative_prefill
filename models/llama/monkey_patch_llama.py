@@ -30,6 +30,9 @@ from transformers.generation.utils import GenerateOutput, ModelOutput
 from models.speculator import (build_speculator, spec_prefill_data_to_inputs,
                                speculate_tokens)
 
+LOOK_AHEAD_CNT = int(os.environ.get("LOOK_AHEAD_CNT", 8))
+KEEP = int(os.environ.get("KEEP", -2))
+
 
 def _update_model_kwargs_for_generation(
         self,
@@ -181,8 +184,8 @@ def generate(
 
     input_ids = kwargs.pop("input_ids", None)
     attention_mask = kwargs.pop("attention_mask", None)
-    look_ahead_cnt=kwargs.pop("look_ahead_cnt", 8)
-    keep=kwargs.pop("keep", 0.3)
+    look_ahead_cnt = kwargs.pop("look_ahead_cnt", LOOK_AHEAD_CNT)
+    keep = kwargs.pop("keep", KEEP)
 
     assert input_ids.shape[0] == 1, "Currently only allowing batch size = 1"
 
