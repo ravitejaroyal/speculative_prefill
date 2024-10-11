@@ -26,6 +26,8 @@ from transformers.models.llama.modeling_llama import (_flash_attention_forward,
                                                       repeat_kv)
 from transformers.utils import logging
 
+from models import VERBOSITY
+
 logger = logging.get_logger(__name__)
 
 
@@ -176,7 +178,7 @@ def speculate_tokens(
     input_ids: torch.Tensor, 
     attention_mask: Optional[torch.Tensor] = None, 
     look_ahead_cnt: int = 8, 
-    keep: float = -1, 
+    keep: float = -2, 
     gen_config: Optional[GenerationConfig] = None
 ) -> SpeculativePrefillData:
 
@@ -218,18 +220,34 @@ def speculate_tokens(
     # [B, prefill_len]
     all_attns = torch.max(torch.stack(all_attns, dim=0), dim=0)[0]
 
-    if keep == -2:
-        # TODO: later refactor
+    # smoothing
+    # all_attns = torch.avg_pool1d(all_attns, kernel_size=5, padding=5 // 2, stride=1)
+
+    if keep == -3:
+        # adaptive strategy based on quantile * ratio
+        # this will remove the influence of the max outliers (e.g. sink tokens)
+        quantile = torch.quantile(all_attns.float(), q=0.98, dim=-1, keepdim=True)
+        threshold = quantile * 0.005
+        # sum to get number of tokens, max over batch
+        topk = (all_attns > threshold).sum(-1).max(0)[0]
+    elif keep == -2:
+        # adaptive strategy based on max * ratio threshold
         max_attns = torch.max(all_attns, dim=-1, keepdim=True)[0]
-        threshold = max_attns * 0.005
+        threshold = max_attns * 0.001
         # sum to get number of tokens, max over batch
         topk = (all_attns > threshold).sum(-1).max(0)[0]
     elif keep == -1:
+        # keep all strategy
         topk = prefill_len
     elif 0.0 < keep < 1.0:
+        # fixed percentage strategy
         topk = math.ceil(prefill_len * keep)
     else:
+        # absolute count strategy
         topk = min(prefill_len, keep)
+
+    if VERBOSITY == 1:
+        print(f"Keep strategy = {keep}, Kept token percentage = {(topk / prefill_len) * 100:.2f}%, Look ahead cnt = {look_ahead_cnt}.")
 
     _, keep_indices = torch.topk(all_attns, dim=-1, k=topk)
 

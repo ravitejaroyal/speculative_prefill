@@ -27,11 +27,9 @@ from transformers.generation.stopping_criteria import StoppingCriteriaList
 from transformers.generation.streamers import BaseStreamer
 from transformers.generation.utils import GenerateOutput, ModelOutput
 
+from models import KEEP, LOOK_AHEAD_CNT
 from models.speculator import (build_speculator, spec_prefill_data_to_inputs,
                                speculate_tokens)
-
-LOOK_AHEAD_CNT = int(os.environ.get("LOOK_AHEAD_CNT", 8))
-KEEP = int(os.environ.get("KEEP", -2))
 
 
 def _update_model_kwargs_for_generation(
