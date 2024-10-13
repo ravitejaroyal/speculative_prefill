@@ -220,14 +220,10 @@ def speculate_tokens(
     # [B, prefill_len]
     all_attns = torch.max(torch.stack(all_attns, dim=0), dim=0)[0]
 
-    # smoothing
-    # all_attns = torch.avg_pool1d(all_attns, kernel_size=5, padding=5 // 2, stride=1)
-
     if keep == -3:
-        # adaptive strategy based on quantile * ratio
-        # this will remove the influence of the max outliers (e.g. sink tokens)
-        quantile = torch.quantile(all_attns.float(), q=0.98, dim=-1, keepdim=True)
-        threshold = quantile * 0.01
+        # adaptive strategy based on max * ratio threshold
+        max_quant_attns = torch.quantile(all_attns.float(), q=0.99, dim=-1, keepdim=True)
+        threshold = max_quant_attns * 0.01
         # sum to get number of tokens, max over batch
         topk = (all_attns > threshold).sum(-1).max(0)[0]
     elif keep == -2:
