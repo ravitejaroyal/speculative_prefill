@@ -11,11 +11,16 @@
     3. send the indices to the main model
 """
 
+import atexit
+import json
 import math
+import os
 from dataclasses import dataclass
 from types import MethodType
 from typing import Dict, Optional, Tuple
 
+import matplotlib.pyplot as plt
+import seaborn as sns
 import torch
 import torch.nn as nn
 from transformers import (AutoModelForCausalLM, GenerationConfig,
@@ -26,7 +31,7 @@ from transformers.models.llama.modeling_llama import (_flash_attention_forward,
                                                       repeat_kv)
 from transformers.utils import logging
 
-from models import VERBOSITY
+from models import SAVE_STATS_DIR, VERBOSITY
 
 logger = logging.get_logger(__name__)
 
@@ -34,6 +39,48 @@ logger = logging.get_logger(__name__)
 @dataclass
 class SpeculativePrefillData:
     keep_indices: Optional[torch.Tensor] = None
+
+
+class SpeculativePrefillStats:
+    def __init__(self):
+        self.num_of_queries = 0
+        self.dropped_token_cnts = []
+        self.keep_ratios = []
+        self.save_stats_dir = SAVE_STATS_DIR
+        if self.save_stats_dir is not None:
+            atexit.register(self.save_results)
+    
+    def update(self, dropped_token_cnt, keep_ratio):
+        self.num_of_queries += 1
+        self.dropped_token_cnts.append(dropped_token_cnt)
+        self.keep_ratios.append(keep_ratio)
+
+    def save_results(self):
+        print(f"Saving stats to {self.save_stats_dir}...")
+        os.makedirs(self.save_stats_dir, exist_ok=True)
+        # save basic info
+        with open(os.path.join(self.save_stats_dir, "stats.json"), 'w') as f:
+            json.dump({
+                "num_of_queries": self.num_of_queries, 
+                "dropped_token_cnts": self.dropped_token_cnts, 
+                "keep_ratios": self.keep_ratios, 
+                "avg_ratio": sum(self.keep_ratios) / self.num_of_queries if self.num_of_queries > 0 else -1
+            }, f)
+        
+        # figure on the distribution of percentage of drops
+        sns.histplot(
+            self.keep_ratios, 
+            bins=20, 
+            kde=True, 
+            color='skyblue', 
+            edgecolor='black'
+        )
+
+        plt.title('Distribution of Speculative Prefill Keep Ratios', fontsize=16)
+        plt.xlabel('Prefill Token Keep Ratio', fontsize=14)
+        plt.ylabel('Frequency', fontsize=14)
+
+        plt.savefig(os.path.join(self.save_stats_dir, "figure.png"), dpi=500)
 
 
 def forward(
@@ -164,6 +211,8 @@ def build_speculator(device: Optional[torch.device] = None) -> LlamaForCausalLM:
         trust_remote_code=True
     )
 
+    speculator.spec_prefill_stats = SpeculativePrefillStats()
+
     for layer_idx in range(speculator.config.num_hidden_layers):
         self_attn = speculator.model.layers[layer_idx].self_attn
         self_attn.forward = MethodType(
@@ -225,13 +274,13 @@ def speculate_tokens(
         max_quant_attns = torch.quantile(all_attns.float(), q=0.99, dim=-1, keepdim=True)
         threshold = max_quant_attns * 0.01
         # sum to get number of tokens, max over batch
-        topk = (all_attns > threshold).sum(-1).max(0)[0]
+        topk = (all_attns > threshold).sum(-1).max(0)[0].item()
     elif keep == -2:
         # adaptive strategy based on max * ratio threshold
         max_attns = torch.max(all_attns, dim=-1, keepdim=True)[0]
         threshold = max_attns * 0.001
         # sum to get number of tokens, max over batch
-        topk = (all_attns > threshold).sum(-1).max(0)[0]
+        topk = (all_attns > threshold).sum(-1).max(0)[0].item()
     elif keep == -1:
         # keep all strategy
         topk = prefill_len
@@ -246,6 +295,11 @@ def speculate_tokens(
         print(f"Keep strategy = {keep}, Kept token percentage = {(topk / prefill_len) * 100:.2f}%, Look ahead cnt = {look_ahead_cnt}.")
 
     _, keep_indices = torch.topk(all_attns, dim=-1, k=topk)
+
+    speculator.spec_prefill_stats.update(
+        dropped_token_cnt=prefill_len - topk, 
+        keep_ratio=(topk / prefill_len)
+    )
 
     return SpeculativePrefillData(keep_indices=keep_indices)
 
