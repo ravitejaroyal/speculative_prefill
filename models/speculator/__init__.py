@@ -272,7 +272,7 @@ def speculate_tokens(
     if keep == -3:
         # adaptive strategy based on max * ratio threshold
         max_quant_attns = torch.quantile(all_attns.float(), q=0.99, dim=-1, keepdim=True)
-        threshold = max_quant_attns * 0.01
+        threshold = max_quant_attns * 0.005
         # sum to get number of tokens, max over batch
         topk = (all_attns > threshold).sum(-1).max(0)[0].item()
     elif keep == -2:
