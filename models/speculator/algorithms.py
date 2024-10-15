@@ -118,7 +118,6 @@ def speculate_tokens_based_on_grad(
         outputs = speculator.forward(
             inputs_embeds=inputs_embeds, 
             attention_mask=attention_mask, 
-            output_hidden_states=True,
             use_cache=False,  
             return_dict=True
         )
