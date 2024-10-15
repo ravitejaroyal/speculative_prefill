@@ -2,7 +2,6 @@ import math
 from typing import Optional
 
 import torch
-from IPython import embed
 from transformers import GenerationConfig, LlamaForCausalLM
 from transformers.utils import logging
 
@@ -108,13 +107,24 @@ def speculate_tokens_based_on_grad(
     prefill_len = input_ids.shape[-1]
 
     with torch.enable_grad():
+        if not speculator.model.gradient_checkpointing:
+            speculator.model.gradient_checkpointing_enable()
+        # set required for using gradient checkpointing
+        speculator.model.training = True
+
+        inputs_embeds: torch.Tensor = speculator.model.embed_tokens(input_ids)
+        inputs_embeds.retain_grad()
+
         outputs = speculator.forward(
-            input_ids=input_ids, 
+            inputs_embeds=inputs_embeds, 
             attention_mask=attention_mask, 
             output_hidden_states=True,
             use_cache=False,  
             return_dict=True
         )
+
+        # set it back
+        speculator.model.training = False
 
         # [B, seqlen, logits]
         logits = outputs.logits
@@ -127,14 +137,10 @@ def speculate_tokens_based_on_grad(
 
         # compute the loss
         loss = torch.nn.functional.mse_loss(decode_token, target)
+        loss.backward()
 
-        # embedding grad for perturbation [B, seqlen, model_size]
-        grads = torch.autograd.grad(
-            outputs=loss, 
-            inputs=outputs.hidden_states[0], 
-            retain_graph=False, 
-            create_graph=False)[0]
-
+        # get the gradients
+        grads = inputs_embeds.grad
         grad_magnitudes = torch.linalg.vector_norm(grads, dim=-1)
 
     if keep == -3:

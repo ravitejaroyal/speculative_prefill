@@ -28,7 +28,7 @@ from transformers.generation.stopping_criteria import StoppingCriteriaList
 from transformers.generation.streamers import BaseStreamer
 from transformers.generation.utils import GenerateOutput, ModelOutput
 
-from models import KEEP, LOOK_AHEAD_CNT, VERBOSITY
+from models import ALGO, KEEP, LOOK_AHEAD_CNT, VERBOSITY
 from models.speculator import (SPECULATOR_ALGO, build_speculator,
                                spec_prefill_data_to_inputs)
 
@@ -192,7 +192,7 @@ def generate(
         torch.cuda.synchronize()
         start_time = time.time()
 
-    spec_prefill_data = SPECULATOR_ALGO["grad"](
+    spec_prefill_data = SPECULATOR_ALGO[ALGO](
         speculator=speculator, 
         input_ids=input_ids, 
         attention_mask=attention_mask, 

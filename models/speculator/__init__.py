@@ -218,11 +218,6 @@ def build_speculator(device: Optional[torch.device] = None) -> LlamaForCausalLM:
             forward, self_attn
         )
 
-    # saves around 10GB mem
-    for name, param in speculator.named_parameters():
-        if name != "model.embed_tokens.weight":
-            param.requires_grad_(False)
-
     return speculator
 
 
