@@ -133,7 +133,9 @@ def speculate_tokens_based_on_grad(
         decode_token = logits[:, -1, :]
 
         # noisy target
-        target = decode_token.detach() + torch.randn_like(decode_token)
+        noise = torch.randn_like(decode_token)
+        noise = noise / torch.linalg.vector_norm(noise, dim=-1)
+        target = decode_token.detach() + noise
 
         # compute the loss
         loss = torch.nn.functional.mse_loss(decode_token, target)
