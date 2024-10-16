@@ -136,8 +136,8 @@ def speculate_tokens_based_on_grad(
         noise = noise / torch.linalg.vector_norm(noise, dim=-1)
         target = decode_token.detach() + noise
 
-        # compute the loss
-        loss = torch.nn.functional.mse_loss(decode_token, target)
+        # compute the loss (CE seems to be much better than MSE)
+        loss = torch.nn.functional.cross_entropy(decode_token, target)
         loss.backward()
 
         # get the gradients
