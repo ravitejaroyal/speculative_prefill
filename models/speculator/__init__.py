@@ -205,7 +205,7 @@ def build_speculator(device: Optional[torch.device] = None) -> LlamaForCausalLM:
         'meta-llama/Llama-3.2-1B-Instruct', 
         torch_dtype=torch.bfloat16, 
         low_cpu_mem_usage=True, 
-        device_map="auto", 
+        device_map=device, 
         attn_implementation="flash_attention_2", # eager is required to output attn scores
         trust_remote_code=True
     )

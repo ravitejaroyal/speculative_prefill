@@ -181,7 +181,10 @@ def generate(
     assert speculator is not None, "Missing speculator"
     assert main_generate is not None, "Missing original generation"
 
-    input_ids = kwargs.pop("input_ids", None)
+    if inputs is not None:
+        input_ids = inputs
+    else:
+        input_ids = kwargs.pop("input_ids", None)
     attention_mask = kwargs.pop("attention_mask", None)
     look_ahead_cnt = kwargs.pop("look_ahead_cnt", LOOK_AHEAD_CNT)
     keep = kwargs.pop("keep", KEEP)
@@ -225,7 +228,6 @@ def generate(
 
     outputs = main_generate(
         **spec_prefill_inputs, 
-        inputs=inputs,
         generation_config=generation_config,
         logits_processor=logits_processor,
         stopping_criteria=stopping_criteria,
