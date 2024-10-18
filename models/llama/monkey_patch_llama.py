@@ -34,70 +34,67 @@ from models.speculator import (SPECULATOR_ALGO, build_speculator,
 
 
 def _update_model_kwargs_for_generation(
-        self,
-        outputs: ModelOutput,
-        model_kwargs: Dict[str, Any],
-        is_encoder_decoder: bool = False,
-        standardize_cache_format: bool = False,
-        num_new_tokens: int = 1,
-    ) -> Dict[str, Any]:
-        # update past_key_values keeping its naming used in model code
-        cache_name, cache = self._extract_past_from_model_output(
-            outputs, standardize_cache_format=standardize_cache_format
+    self,
+    outputs: ModelOutput,
+    model_kwargs: Dict[str, Any],
+    is_encoder_decoder: bool = False,
+    num_new_tokens: int = 1,
+) -> Dict[str, Any]:
+    # update past_key_values keeping its naming used in model code
+    cache_name, cache = self._extract_past_from_model_output(outputs)
+    model_kwargs[cache_name] = cache
+    if getattr(outputs, "state", None) is not None:
+        model_kwargs["state"] = outputs.state
+
+    # update token_type_ids with last value
+    if "token_type_ids" in model_kwargs:
+        token_type_ids = model_kwargs["token_type_ids"]
+        model_kwargs["token_type_ids"] = torch.cat([token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], dim=-1)
+
+    if not is_encoder_decoder:
+        # update attention mask
+        if "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            model_kwargs["attention_mask"] = torch.cat(
+                [attention_mask, attention_mask.new_ones((attention_mask.shape[0], 1))], dim=-1
+            )
+    else:
+        # update decoder attention mask
+        if "decoder_attention_mask" in model_kwargs:
+            decoder_attention_mask = model_kwargs["decoder_attention_mask"]
+            model_kwargs["decoder_attention_mask"] = torch.cat(
+                [decoder_attention_mask, decoder_attention_mask.new_ones((decoder_attention_mask.shape[0], 1))],
+                dim=-1,
+            )
+
+    # update the position ids and cache positions correctly here
+    if model_kwargs.get("use_cache", True):
+        model_kwargs["cache_position"] = model_kwargs["cache_position"][-1:] + num_new_tokens
+        # [B, 1]
+        last_pos_ids = model_kwargs["position_ids"][:, -1:]
+        model_kwargs["position_ids"] = torch.where(
+            last_pos_ids < model_kwargs["original_seq_len"], 
+            model_kwargs["original_seq_len"], 
+            last_pos_ids + 1
         )
-        model_kwargs[cache_name] = cache
-        if getattr(outputs, "state", None) is not None:
-            model_kwargs["state"] = outputs.state
+    else:
+        past_positions = model_kwargs.pop("cache_position")
+        new_positions = torch.arange(
+            past_positions[-1] + 1, past_positions[-1] + num_new_tokens + 1, dtype=past_positions.dtype
+        ).to(past_positions.device)
+        model_kwargs["cache_position"] = torch.cat((past_positions, new_positions))
 
-        # update token_type_ids with last value
-        if "token_type_ids" in model_kwargs:
-            token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = torch.cat([token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], dim=-1)
-
-        if not is_encoder_decoder:
-            # update attention mask
-            if "attention_mask" in model_kwargs:
-                attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = torch.cat(
-                    [attention_mask, attention_mask.new_ones((attention_mask.shape[0], 1))], dim=-1
-                )
-        else:
-            # update decoder attention mask
-            if "decoder_attention_mask" in model_kwargs:
-                decoder_attention_mask = model_kwargs["decoder_attention_mask"]
-                model_kwargs["decoder_attention_mask"] = torch.cat(
-                    [decoder_attention_mask, decoder_attention_mask.new_ones((decoder_attention_mask.shape[0], 1))],
-                    dim=-1,
-                )
-
-        # update the position ids and cache positions correctly here
-        if model_kwargs.get("use_cache", True):
-            model_kwargs["cache_position"] = model_kwargs["cache_position"][-1:] + num_new_tokens
-            # [B, 1]
-            last_pos_ids = model_kwargs["position_ids"][:, -1:]
-            model_kwargs["position_ids"] = torch.where(
+        last_pos_ids = model_kwargs["position_ids"][:, -1:]
+        model_kwargs["position_ids"] = torch.cat([
+            model_kwargs["position_ids"], 
+            torch.where(
                 last_pos_ids < model_kwargs["original_seq_len"], 
                 model_kwargs["original_seq_len"], 
                 last_pos_ids + 1
             )
-        else:
-            past_positions = model_kwargs.pop("cache_position")
-            new_positions = torch.arange(
-                past_positions[-1] + 1, past_positions[-1] + num_new_tokens + 1, dtype=past_positions.dtype
-            ).to(past_positions.device)
-            model_kwargs["cache_position"] = torch.cat((past_positions, new_positions))
+        ], dim=-1)
 
-            last_pos_ids = model_kwargs["position_ids"][:, -1:]
-            model_kwargs["position_ids"] = torch.cat([
-                model_kwargs["position_ids"], 
-                torch.where(
-                    last_pos_ids < model_kwargs["original_seq_len"], 
-                    model_kwargs["original_seq_len"], 
-                    last_pos_ids + 1
-                )
-            ], dim=-1)
-
-        return model_kwargs
+    return model_kwargs
 
 
 def _validate_model_kwargs(self, model_kwargs: Dict[str, Any]):
