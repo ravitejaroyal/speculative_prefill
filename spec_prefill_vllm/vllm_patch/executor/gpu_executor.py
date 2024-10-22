@@ -1,3 +1,4 @@
+import os
 from typing import Callable, Optional, Tuple, Type
 
 from vllm.executor.gpu_executor import GPUExecutor
@@ -10,7 +11,10 @@ class PatchedGPUExecutor(GPUExecutor):
             Patching this logic to consider using prefill speculator
         """
         worker_class_fn = None
-        if self.scheduler_config.is_multi_step:
+        if os.environ.get("spec_model", None):
+            worker_module_name = "vllm_patch.worker.spec_prefill_worker"
+            worker_class_name = "create_spec_worker"
+        elif self.scheduler_config.is_multi_step:
             worker_module_name = "vllm.worker.multi_step_worker"
             worker_class_name = "MultiStepWorker"
         elif self.speculative_config:

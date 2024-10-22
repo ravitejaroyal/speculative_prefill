@@ -1,7 +1,7 @@
 from vllm_patch import enable_prefill_spec
 
 # monkey patch must be placed before everything
-enable_prefill_spec()
+enable_prefill_spec(spec_model='meta-llama/Llama-3.2-1B-Instruct')
 
 from vllm import LLM, SamplingParams
 from vllm.executor.gpu_executor import GPUExecutor
@@ -12,7 +12,9 @@ print(GPUExecutor)
     HUGGING_FACE_HUB_TOKEN=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 python main.py
 """
 
-# llm = LLM(
-#     'meta-llama/Llama-3.2-1B-Instruct', 
-#     tokenizer='meta-llama/Meta-Llama-3.1-8B-Instruct'
-# )
+llm = LLM(
+    'meta-llama/Llama-3.2-1B-Instruct', 
+    tokenizer='meta-llama/Meta-Llama-3.1-8B-Instruct'
+)
+
+print(llm)
