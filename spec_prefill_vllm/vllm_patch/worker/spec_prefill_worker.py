@@ -7,7 +7,7 @@ from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
-from vllm_patch.worker.spec_worker_base import SpecWorker
+from vllm_patch.worker.spec_worker_base import HFSpecWorker, SpecWorker
 
 
 def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
@@ -19,7 +19,7 @@ def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
     base_model_worker = Worker(*args, **kwargs) 
 
     # create the spec prefill model
-    spec_model_worker = SpecWorker(spec_model_name=spec_model_name)
+    spec_model_worker = HFSpecWorker(spec_model_name=spec_model_name)
 
     return SpecPrefillWorker(
         base_model_worker=base_model_worker, 
