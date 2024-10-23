@@ -20,7 +20,8 @@ def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
 
     # create the spec prefill model (assume the same config as before)
     spec_model_kwargs = kwargs.copy()
-    kwargs["model_config"].model = spec_model_name
+    spec_model_kwargs["model_config"].model = spec_model_name
+    spec_model_kwargs["parallel_config"].pipeline_parallel_size = 1
     spec_model_worker = SpecWorker(*args, **spec_model_kwargs)
 
     return SpecPrefillWorker(
@@ -33,7 +34,7 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
     def __init__(
         self, 
         base_model_worker: Worker, 
-        spec_model_worker: Worker
+        spec_model_worker: SpecWorker
     ):
         self.base_model_worker = base_model_worker
         self.spec_model_worker = spec_model_worker
@@ -56,12 +57,12 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         
     def initialize_cache(self, num_gpu_blocks: int, num_cpu_blocks: int) -> None:
         self.base_model_worker.initialize_cache(
-            num_gpu_blocks=num_gpu_blocks, 
-            num_cpu_blocks=num_cpu_blocks
+            num_gpu_blocks=num_gpu_blocks // 2, 
+            num_cpu_blocks=num_cpu_blocks // 2
         )
         self.spec_model_worker.initialize_cache(
-            num_gpu_blocks=num_gpu_blocks, 
-            num_cpu_blocks=num_cpu_blocks
+            num_gpu_blocks=num_gpu_blocks // 2, 
+            num_cpu_blocks=num_cpu_blocks // 2
         )
     
     @torch.inference_mode
@@ -69,11 +70,24 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self, 
         execute_model_req: ExecuteModelRequest | None = None
     ) -> List[SamplerOutput] | None:
-        pass
+        
+        # make a copy for the spec model
+        filtered_seq_group_metadata_list = []
 
-    @torch.inference_mode
-    def start_worker_execution_loop(self) -> None:
-        pass
+        # we go over each request and check if it is a prompt data
+        for seq_group_metadata in execute_model_req.seq_group_metadata_list:
+            if seq_group_metadata.is_prompt:
+                filtered_seq_group_metadata_list.append(seq_group_metadata)
+
+        # we do spec prefill if we need to
+        if len(filtered_seq_group_metadata_list) > 0:
+            execute_model_req_clone = execute_model_req.clone(
+                filtered_seq_group_metadata_list)
+
+            spec_output = self.spec_model_worker.speculate_tokens(execute_model_req_clone)
+            # TODO: drop indices
+
+        return self.base_model_worker.execute_model(execute_model_req)
 
     def get_cache_block_size_bytes(self) -> int:
         raise NotImplementedError

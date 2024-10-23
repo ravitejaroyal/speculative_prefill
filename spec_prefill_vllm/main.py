@@ -17,4 +17,34 @@ llm = LLM(
     tokenizer='meta-llama/Meta-Llama-3.1-8B-Instruct'
 )
 
-print(llm)
+# conversation = [
+#     {
+#         "role": "system",
+#         "content": "You are a helpful assistant"
+#     },
+#     {
+#         "role": "user",
+#         "content": "Hello"
+#     },
+#     {
+#         "role": "assistant",
+#         "content": "Hello! How can I assist you today?"
+#     },
+#     {
+#         "role": "user",
+#         "content": "Write an essay about the importance of higher education.",
+#     },
+# ]
+
+# print(llm.chat(conversation))
+
+print(llm.generate(
+    [
+        "Where is the Beijing City? ", 
+        "Tell me a bit about the importance of higher education. "
+    ], 
+    SamplingParams(
+        max_tokens=2, 
+        temperature=0.0
+    )
+))
