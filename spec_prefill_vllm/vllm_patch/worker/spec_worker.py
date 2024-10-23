@@ -11,13 +11,24 @@ from vllm.sequence import ExecuteModelRequest
 class SpecWorker:
     def speculate(
         self, 
-        original_request: ExecuteModelRequest, 
-        filtered_request: ExecuteModelRequest, 
+        execute_model_request: ExecuteModelRequest
     ) -> ExecuteModelRequest:
-        indices = self._speculate_indices(filtered_request)
-        # now we need to update the original request somehow
-        
+        all_indices = self._speculate_indices(execute_model_request)
+        # now we need to update the original request
+        index_pos = 0
+        new_seq_group_metadata_list = []
+        for seq_group_metadata in execute_model_request.seq_group_metadata_list:
+            if not seq_group_metadata.is_prompt:
+                new_seq_group_metadata_list.append(seq_group_metadata)
+            else:
+                cur_indices = all_indices[index_pos]
+                index_pos += 1
 
+                request_id = int(seq_group_metadata.request_id)
+
+        assert index_pos == len(all_indices)
+        return execute_model_request.clone(
+            seq_group_metadata_list=new_seq_group_metadata_list)
     
     @abstractmethod
     def _speculate_indices(
@@ -103,14 +114,14 @@ class HFSpecWorker(SpecWorker):
         seq_lens = []
 
         for seq_group_metadata in execute_model_req.seq_group_metadata_list:
-            assert seq_group_metadata.is_prompt
-            request_id = seq_group_metadata.request_id
-            prompt_token_ids = seq_group_metadata.seq_data[int(request_id)].prompt_token_ids
-            prompt_len = len(prompt_token_ids)
+            if seq_group_metadata.is_prompt:
+                request_id = seq_group_metadata.request_id
+                prompt_token_ids = seq_group_metadata.seq_data[int(request_id)].prompt_token_ids
+                prompt_len = len(prompt_token_ids)
 
-            input_ids.extend(prompt_token_ids)
-            position_ids.append(torch.arange(0, prompt_len))
-            seq_lens.append(prompt_len)
+                input_ids.extend(prompt_token_ids)
+                position_ids.append(torch.arange(0, prompt_len))
+                seq_lens.append(prompt_len)
 
         input_ids = torch.LongTensor(input_ids)
         position_ids = torch.concatenate(position_ids).to(torch.int64)
