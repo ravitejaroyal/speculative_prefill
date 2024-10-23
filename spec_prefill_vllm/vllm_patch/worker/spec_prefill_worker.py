@@ -7,7 +7,7 @@ from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
-from vllm_patch.worker.spec_worker_base import HFSpecWorker, SpecWorker
+from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
 
 
 def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
@@ -75,8 +75,10 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
             execute_model_req_clone = execute_model_req.clone(
                 filtered_seq_group_metadata_list)
 
-            spec_output = self.spec_model_worker.speculate_tokens(execute_model_req_clone)
-            # TODO: drop indices
+            execute_model_req = self.spec_model_worker.speculate(
+                original_request=execute_model_req, 
+                filtered_request=execute_model_req_clone
+            )
 
         return self.base_model_worker.execute_model(execute_model_req)
 
