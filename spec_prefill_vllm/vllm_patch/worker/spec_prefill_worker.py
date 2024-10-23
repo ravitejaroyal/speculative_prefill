@@ -18,11 +18,8 @@ def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
     kwargs["model_runner_cls"] = ModelRunner
     base_model_worker = Worker(*args, **kwargs) 
 
-    # create the spec prefill model (assume the same config as before)
-    spec_model_kwargs = kwargs.copy()
-    spec_model_kwargs["model_config"].model = spec_model_name
-    spec_model_kwargs["parallel_config"].pipeline_parallel_size = 1
-    spec_model_worker = SpecWorker(*args, **spec_model_kwargs)
+    # create the spec prefill model
+    spec_model_worker = SpecWorker(spec_model_name=spec_model_name)
 
     return SpecPrefillWorker(
         base_model_worker=base_model_worker, 
@@ -44,10 +41,7 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         memory allocations.
         """
         self.base_model_worker.init_device()
-        self.spec_model_worker.init_device()
-
         self.base_model_worker.load_model()
-        self.spec_model_worker.load_model()
 
     def load_model(self, *args, **kwargs):
         pass
@@ -57,15 +51,12 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         
     def initialize_cache(self, num_gpu_blocks: int, num_cpu_blocks: int) -> None:
         self.base_model_worker.initialize_cache(
-            num_gpu_blocks=num_gpu_blocks // 2, 
-            num_cpu_blocks=num_cpu_blocks // 2
-        )
-        self.spec_model_worker.initialize_cache(
-            num_gpu_blocks=num_gpu_blocks // 2, 
-            num_cpu_blocks=num_cpu_blocks // 2
+            num_gpu_blocks=num_gpu_blocks, 
+            num_cpu_blocks=num_cpu_blocks
         )
     
-    @torch.inference_mode
+    # don't use inference mode which doesn't allow re-enabling grad compute
+    @torch.no_grad
     def execute_model(
         self, 
         execute_model_req: ExecuteModelRequest | None = None
