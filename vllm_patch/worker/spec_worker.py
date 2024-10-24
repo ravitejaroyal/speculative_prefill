@@ -1,11 +1,12 @@
 import math
 import os
 from abc import abstractmethod
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import torch
 from transformers import LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
+from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.sequence import ExecuteModelRequest
 
 from vllm_patch.config import SpecConfig
@@ -59,18 +60,20 @@ class SpecWorker:
     ) -> Tuple[torch.LongTensor]:
         raise NotImplementedError
 
+    def init_device(self):
+        pass
+
+    def load_model(self):
+        pass
+
 
 class HFSpecWorker(SpecWorker):
     def __init__(
         self, 
         spec_model_name: str
     ) -> None:
-        self.model = LlamaForCausalLM.from_pretrained(
-            spec_model_name, 
-            torch_dtype=torch.bfloat16, 
-            device_map="auto", 
-            attn_implementation="flash_attention_2",
-        )
+        self.spec_model_name = spec_model_name
+        self.model: Optional[LlamaForCausalLM] = None
 
         self.spec_config = SpecConfig.from_path(
             os.environ.get("spec_config_path", None)
@@ -78,6 +81,15 @@ class HFSpecWorker(SpecWorker):
 
         print("\033[92m{}\033[00m".format(
             f"Using spec config:\n{self.spec_config}"))
+
+    def load_model(self):
+        if get_tensor_model_parallel_rank() == 0:
+            self.model = LlamaForCausalLM.from_pretrained(
+                self.spec_model_name, 
+                torch_dtype=torch.bfloat16, 
+                device_map="auto", 
+                attn_implementation="flash_attention_2",
+            )
 
     def _speculate_indices(
         self, 

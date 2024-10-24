@@ -51,6 +51,9 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self.base_model_worker.init_device()
         self.base_model_worker.load_model()
 
+        self.spec_model_worker.init_device()
+        self.spec_model_worker.load_model()
+
     def load_model(self, *args, **kwargs):
         pass
 
