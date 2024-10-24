@@ -16,7 +16,8 @@ llm = LLM(
     # 'meta-llama/Llama-3.2-1B-Instruct', 
     'meta-llama/Meta-Llama-3.1-8B-Instruct', 
     tokenizer='meta-llama/Meta-Llama-3.1-8B-Instruct', 
-    enable_chunked_prefill=False
+    gpu_memory_utilization=0.8, 
+    enable_chunked_prefill=False, 
 )
 
 # input_text = """

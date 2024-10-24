@@ -69,7 +69,9 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self, 
         execute_model_req: ExecuteModelRequest | None = None
     ) -> List[SamplerOutput] | None:
-        execute_model_req = self.spec_model_worker.speculate(execute_model_req)
+        # TP > 1 will need this check
+        if execute_model_req is not None:
+            execute_model_req = self.spec_model_worker.speculate(execute_model_req)
         return self.base_model_worker.execute_model(execute_model_req)
 
     def get_cache_block_size_bytes(self) -> int:
