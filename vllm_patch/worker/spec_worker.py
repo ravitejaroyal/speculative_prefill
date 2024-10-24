@@ -7,6 +7,7 @@ import torch
 from transformers import LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from vllm.sequence import ExecuteModelRequest
+
 from vllm_patch.config import SpecConfig
 from vllm_patch.data.sequence import AugmentedSequenceData
 

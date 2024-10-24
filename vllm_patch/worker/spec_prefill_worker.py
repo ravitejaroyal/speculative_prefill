@@ -7,6 +7,7 @@ from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
+
 from vllm_patch.data.input_builder import AugmentedModelInputForGPUBuilder
 from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
 
@@ -14,6 +15,9 @@ from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
 def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
     spec_model_name = os.environ.get("spec_model", None)
     assert spec_model_name is not None
+
+    assert kwargs["scheduler_config"].chunked_prefill_enabled == False, \
+        "Please set --enable-chunked-prefill=False or enable_chunked_prefill=False. "
 
     # create the base model
     kwargs["model_runner_cls"] = ModelRunner

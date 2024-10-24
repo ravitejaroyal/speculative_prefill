@@ -13,8 +13,8 @@ from vllm import LLM, SamplingParams
 """
 
 llm = LLM(
-    'meta-llama/Llama-3.2-1B-Instruct', 
-    # 'meta-llama/Meta-Llama-3.1-8B-Instruct', 
+    # 'meta-llama/Llama-3.2-1B-Instruct', 
+    'meta-llama/Meta-Llama-3.1-8B-Instruct', 
     tokenizer='meta-llama/Meta-Llama-3.1-8B-Instruct', 
     enable_chunked_prefill=False
 )
