@@ -1,4 +1,5 @@
 import math
+import os
 from abc import abstractmethod
 from typing import Dict, Tuple
 
@@ -6,6 +7,7 @@ import torch
 from transformers import LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from vllm.sequence import ExecuteModelRequest
+from vllm_patch.config import SpecConfig
 from vllm_patch.data.sequence import AugmentedSequenceData
 
 
@@ -69,6 +71,12 @@ class HFSpecWorker(SpecWorker):
             attn_implementation="flash_attention_2",
         )
 
+        self.spec_config = SpecConfig.from_path(
+            os.environ.get("spec_config_path", None)
+        )
+
+        print(f"Using spec config:\n{self.spec_config}")
+
     def _speculate_indices(
         self, 
         execute_model_req: ExecuteModelRequest | None = None
@@ -118,7 +126,8 @@ class HFSpecWorker(SpecWorker):
         kept_indices = ()
         for sample_gm in grad_magnitudes:
             seq_len = len(sample_gm)
-            topk = math.ceil(seq_len * 0.6)
+            assert self.spec_config.keep_strategy == "percentage"
+            topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
             _, indices = torch.topk(sample_gm, k=topk, dim=-1)
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
