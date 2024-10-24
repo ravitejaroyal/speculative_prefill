@@ -75,7 +75,8 @@ class HFSpecWorker(SpecWorker):
             os.environ.get("spec_config_path", None)
         )
 
-        print(f"Using spec config:\n{self.spec_config}")
+        print("\033[92m{}\033[00m".format(
+            f"Using spec config:\n{self.spec_config}"))
 
     def _speculate_indices(
         self, 
