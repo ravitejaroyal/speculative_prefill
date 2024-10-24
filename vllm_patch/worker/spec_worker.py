@@ -100,6 +100,26 @@ class HFSpecWorker(SpecWorker):
         execute_model_req: ExecuteModelRequest | None = None
     ) -> Tuple[torch.LongTensor]:
         hf_kwargs = self._extract_hf_inputs(execute_model_req)
+        
+        grad_magnitudes = getattr(
+            self, 
+            f"_compute_grad_magnitudes_by_{self.spec_config.grad_algo}")(**hf_kwargs)
+
+        # for each sample we choose the indices
+        kept_indices = ()
+        for sample_gm in grad_magnitudes:
+            seq_len = len(sample_gm)
+            assert self.spec_config.keep_strategy == "percentage"
+            topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
+            _, indices = torch.topk(sample_gm, k=topk, dim=-1)
+            kept_indices = kept_indices + (torch.sort(indices)[0], )
+
+        return kept_indices
+
+    def _compute_grad_magnitudes_by_backprop(
+        self, 
+        **hf_kwargs
+    ) -> Tuple[torch.Tensor]:
         seq_lens = hf_kwargs.pop("seq_lens")
         last_token_pos = hf_kwargs.pop("last_token_pos")
 
@@ -145,17 +165,14 @@ class HFSpecWorker(SpecWorker):
         # Tuple [seqlen]
         grad_magnitudes = torch.split(grad_magnitudes, seq_lens.tolist())
 
-        # for each sample we choose the indices
-        kept_indices = ()
-        for sample_gm in grad_magnitudes:
-            seq_len = len(sample_gm)
-            assert self.spec_config.keep_strategy == "percentage"
-            topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
-            _, indices = torch.topk(sample_gm, k=topk, dim=-1)
-            kept_indices = kept_indices + (torch.sort(indices)[0], )
+        return grad_magnitudes
 
-        return kept_indices
-    
+    def _compute_grad_magnitudes_by_finite_difference(
+        self, 
+        **hf_kwargs
+    ) -> Tuple[torch.Tensor]:
+        pass
+
     def _extract_hf_inputs(
         self, 
         execute_model_req: ExecuteModelRequest | None = None
