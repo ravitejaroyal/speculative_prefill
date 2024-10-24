@@ -14,7 +14,7 @@ python -m eval.lm_eval \
     --tasks mmlu_generative \
     --gen_kwargs do_sample=False,max_gen_toks=2 \
     --limit 100 \
-    --batch_size 2
+    --batch_size 4
 """
 
 if __name__ == "__main__":
