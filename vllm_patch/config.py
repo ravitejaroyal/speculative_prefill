@@ -9,6 +9,7 @@ class SpecConfig:
 
     keep_strategy: Optional[str]
     keep_kwargs: Optional[Dict[str, Any]] = None
+    gradient_checkpointing: bool = True
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):

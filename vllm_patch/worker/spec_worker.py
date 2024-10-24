@@ -91,6 +91,9 @@ class HFSpecWorker(SpecWorker):
                 attn_implementation="flash_attention_2",
             )
 
+            for param in self.model.parameters():
+                param.requires_grad_(False)
+
     def _speculate_indices(
         self, 
         execute_model_req: ExecuteModelRequest | None = None
@@ -100,6 +103,11 @@ class HFSpecWorker(SpecWorker):
         last_token_pos = hf_kwargs.pop("last_token_pos")
 
         with torch.enable_grad():
+            if self.spec_config.gradient_checkpointing and \
+                not self.model.model.gradient_checkpointing:
+                self.model.gradient_checkpointing_enable()
+                self.model.model.training = True
+
             inputs_embeds: torch.Tensor = self.model.model.embed_tokens(
                 hf_kwargs.pop("input_ids")
             )
