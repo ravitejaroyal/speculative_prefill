@@ -27,14 +27,15 @@ class SpecWorker:
         # now we need to update the original request
         index_pos = 0
         new_seq_group_metadata_list = []
-        for seq_group_metadata in execute_model_request.seq_group_metadata_list:
-            if seq_group_metadata.is_prompt:
+        for metadata in execute_model_request.seq_group_metadata_list:
+            if metadata.is_prompt:
                 cur_indices = all_indices[index_pos].cpu()
                 index_pos += 1
 
                 # get the seq data
-                request_id = int(seq_group_metadata.request_id)
-                seq_data = seq_group_metadata.seq_data[request_id]
+                assert len(metadata.seq_data) == 1
+                seq_id = metadata.get_first_seq_id()
+                seq_data = metadata.seq_data[seq_id]
                 
                 prompt_token_ids = seq_data._prompt_token_ids
                 output_token_ids = seq_data._output_token_ids
@@ -45,9 +46,9 @@ class SpecWorker:
                     output_token_ids=output_token_ids
                 )
 
-                seq_group_metadata.seq_data[request_id] = new_seq_data
+                metadata.seq_data[seq_id] = new_seq_data
 
-            new_seq_group_metadata_list.append(seq_group_metadata)
+            new_seq_group_metadata_list.append(metadata)
 
         assert index_pos == len(all_indices)
         return execute_model_request.clone(

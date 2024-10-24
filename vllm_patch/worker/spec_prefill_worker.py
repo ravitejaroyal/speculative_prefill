@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import torch
 from vllm.model_executor.layers.sampler import SamplerOutput
@@ -9,6 +9,7 @@ from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
 
 from vllm_patch.data.input_builder import AugmentedModelInputForGPUBuilder
+from vllm_patch.data.sequence import AugmentedSequenceData
 from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
 
 
@@ -43,6 +44,8 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
 
         self.base_model_worker.model_runner._builder_cls = \
             AugmentedModelInputForGPUBuilder
+        
+        self.id_to_context_len: Dict[str, int] = {}
 
     def init_device(self) -> None:
         """Initialize device state, such as loading the model or other on-device
@@ -75,7 +78,29 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         # TP > 1 will need this check
         if execute_model_req is not None:
             execute_model_req = self.spec_model_worker.speculate(execute_model_req)
+            execute_model_req = self._record_and_update_requests(execute_model_req)
         return self.base_model_worker.execute_model(execute_model_req)
+
+    def _record_and_update_requests(
+        self, 
+        execute_model_req: ExecuteModelRequest
+    ) -> ExecuteModelRequest:
+        for metadata in execute_model_req.seq_group_metadata_list:
+            assert len(metadata.seq_data) == 1
+            request_id = metadata.request_id
+            seq_id = metadata.get_first_seq_id()
+            id = f"{request_id}_{seq_id}"
+            seq_data: AugmentedSequenceData = metadata.seq_data[seq_id]
+
+            if metadata.is_prompt:    
+                self.id_to_context_len[id] = seq_data.get_prompt_len()
+            else:
+                seq_data._context_len = self.id_to_context_len[id]
+                metadata.seq_data[seq_id] = seq_data
+                # we decode every time
+                self.id_to_context_len[id] += 1
+
+        return execute_model_req
 
     def get_cache_block_size_bytes(self) -> int:
         raise NotImplementedError

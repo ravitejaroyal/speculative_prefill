@@ -8,13 +8,14 @@ VLLM_TOKEN_ID_ARRAY_TYPE = "l"
 
 class AugmentedSequenceData(SequenceData):
     _position_ids: GenericSequence[int] = None
+    _context_len: int = -1
 
     @staticmethod
     def from_seqs_and_pos_ids(
         prompt_token_ids: GenericSequence[int], 
         position_ids: GenericSequence[int], 
         output_token_ids: Optional[GenericSequence[int]] = None
-    ) -> "SequenceData":
+    ) -> "AugmentedSequenceData":
         """
         Construct a :class:`SequenceData` instance from prompt and output
         token sequences.
