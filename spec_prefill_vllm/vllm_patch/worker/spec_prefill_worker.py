@@ -7,6 +7,7 @@ from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
+from vllm_patch.data.input_builder import AugmentedModelInputForGPUBuilder
 from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
 
 
@@ -36,6 +37,9 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self.base_model_worker = base_model_worker
         self.spec_model_worker = spec_model_worker
 
+        self.base_model_worker.model_runner._builder_cls = \
+            AugmentedModelInputForGPUBuilder
+
     def init_device(self) -> None:
         """Initialize device state, such as loading the model or other on-device
         memory allocations.
@@ -61,25 +65,7 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self, 
         execute_model_req: ExecuteModelRequest | None = None
     ) -> List[SamplerOutput] | None:
-        
-        # make a copy for the spec model
-        filtered_seq_group_metadata_list = []
-
-        # we go over each request and check if it is a prompt data
-        for seq_group_metadata in execute_model_req.seq_group_metadata_list:
-            if seq_group_metadata.is_prompt:
-                filtered_seq_group_metadata_list.append(seq_group_metadata)
-
-        # we do spec prefill if we need to
-        if len(filtered_seq_group_metadata_list) > 0:
-            execute_model_req_clone = execute_model_req.clone(
-                filtered_seq_group_metadata_list)
-
-            execute_model_req = self.spec_model_worker.speculate(
-                original_request=execute_model_req, 
-                filtered_request=execute_model_req_clone
-            )
-
+        execute_model_req = self.spec_model_worker.speculate(execute_model_req)
         return self.base_model_worker.execute_model(execute_model_req)
 
     def get_cache_block_size_bytes(self) -> int:

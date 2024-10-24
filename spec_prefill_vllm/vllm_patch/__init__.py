@@ -1,6 +1,6 @@
 import os
-from typing import Optional
 
+from vllm_patch.data import patch_data
 from vllm_patch.executor import patch_executor
 from vllm_patch.worker import patch_worker
 
@@ -14,3 +14,4 @@ def enable_prefill_spec(
     print("Applying speculative prefill vllm monkey patch...")
     patch_executor()
     patch_worker()
+    patch_data()

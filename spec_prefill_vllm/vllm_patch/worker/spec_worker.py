@@ -6,6 +6,7 @@ import torch
 from transformers import LlamaForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from vllm.sequence import ExecuteModelRequest
+from vllm_patch.data.sequence import AugmentedSequenceData
 
 
 class SpecWorker:
@@ -13,18 +14,36 @@ class SpecWorker:
         self, 
         execute_model_request: ExecuteModelRequest
     ) -> ExecuteModelRequest:
+        # Don't do anything if all requests are decode
+        if sum([data.is_prompt for data 
+            in execute_model_request.seq_group_metadata_list]) == 0:
+            return execute_model_request
+
         all_indices = self._speculate_indices(execute_model_request)
         # now we need to update the original request
         index_pos = 0
         new_seq_group_metadata_list = []
         for seq_group_metadata in execute_model_request.seq_group_metadata_list:
-            if not seq_group_metadata.is_prompt:
-                new_seq_group_metadata_list.append(seq_group_metadata)
-            else:
-                cur_indices = all_indices[index_pos]
+            if seq_group_metadata.is_prompt:
+                cur_indices = all_indices[index_pos].cpu()
                 index_pos += 1
 
+                # get the seq data
                 request_id = int(seq_group_metadata.request_id)
+                seq_data = seq_group_metadata.seq_data[request_id]
+                
+                prompt_token_ids = seq_data._prompt_token_ids
+                output_token_ids = seq_data._output_token_ids
+                
+                new_seq_data = AugmentedSequenceData.from_seqs_and_pos_ids(
+                    prompt_token_ids=torch.LongTensor(prompt_token_ids)[cur_indices], 
+                    position_ids=cur_indices.tolist(), 
+                    output_token_ids=output_token_ids
+                )
+
+                seq_group_metadata.seq_data[request_id] = new_seq_data
+
+            new_seq_group_metadata_list.append(seq_group_metadata)
 
         assert index_pos == len(all_indices)
         return execute_model_request.clone(
