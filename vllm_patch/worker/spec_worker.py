@@ -167,12 +167,6 @@ class HFSpecWorker(SpecWorker):
 
         return grad_magnitudes
 
-    def _compute_grad_magnitudes_by_finite_difference(
-        self, 
-        **hf_kwargs
-    ) -> Tuple[torch.Tensor]:
-        pass
-
     def _extract_hf_inputs(
         self, 
         execute_model_req: ExecuteModelRequest | None = None
