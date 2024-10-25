@@ -11,6 +11,7 @@ class SpecConfig:
     keep_kwargs: Optional[Dict[str, Any]] = None
     gradient_checkpointing: bool = True
     algo: str = "backprop"
+    do_profile: bool = False
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):

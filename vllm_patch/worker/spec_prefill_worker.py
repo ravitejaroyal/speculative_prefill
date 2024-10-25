@@ -1,13 +1,17 @@
 import os
-from typing import Dict, List, Tuple
+import time
+from typing import Dict, List, Optional, Tuple
 
 import torch
+from torch.distributed import barrier
+from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.model_executor.layers.sampler import SamplerOutput
 from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
 
+from vllm_patch.config import SpecConfig
 from vllm_patch.data.input_builder import AugmentedModelInputForGPUBuilder
 from vllm_patch.data.sequence import AugmentedSequenceData
 from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
@@ -75,11 +79,48 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self, 
         execute_model_req: ExecuteModelRequest | None = None
     ) -> List[SamplerOutput] | None:
+        
+        spec_config: Optional[SpecConfig] = \
+            getattr(self.spec_model_worker, "spec_config", None)
+        do_profile = spec_config is not None and spec_config.do_profile
+
+        if do_profile:
+            torch.cuda.synchronize()
+            barrier()
+            if get_tensor_model_parallel_rank() == 0:
+                start = time.perf_counter()
+
         # TP > 1 will need this check
         if execute_model_req is not None:
             execute_model_req = self.spec_model_worker.speculate(execute_model_req)
             execute_model_req = self._record_and_update_requests(execute_model_req)
-        return self.base_model_worker.execute_model(execute_model_req)
+
+        if do_profile:
+            torch.cuda.synchronize()
+            barrier()
+            if get_tensor_model_parallel_rank() == 0:
+                finish_spec = time.perf_counter()
+
+        sampler_outputs = self.base_model_worker.execute_model(execute_model_req)
+
+        if do_profile:
+            torch.cuda.synchronize()
+            barrier()
+            if get_tensor_model_parallel_rank() == 0:
+                finish_main = time.perf_counter()
+
+                time_for_spec = finish_spec - start
+                time_for_main = finish_main - finish_spec
+                spec_ratio = time_for_spec / (finish_main - start)
+                
+                print(
+                    "Profiler: \n"
+                    f"  Speculator takes: {time_for_spec}.\n"
+                    f"  Main model takes: {time_for_main}.\n"
+                    f"  Spec time ratio: {spec_ratio * 100:.2f}%."
+                )
+
+        return sampler_outputs
 
     def _record_and_update_requests(
         self, 
