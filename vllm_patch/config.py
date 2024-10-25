@@ -10,7 +10,7 @@ class SpecConfig:
     keep_strategy: Optional[str]
     keep_kwargs: Optional[Dict[str, Any]] = None
     gradient_checkpointing: bool = True
-    grad_algo: str = "backprop"
+    algo: str = "backprop"
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):
@@ -36,7 +36,7 @@ class SpecConfig:
     
     def __post_init__(self):
         assert self.keep_strategy in ["adaptive", "percentage"]
-        assert self.grad_algo in ["backprop", "finite_difference"]
+        assert self.algo in ["backprop"]
 
         if self.keep_strategy is None:
             self.keep_strategy = "percentage"

@@ -101,22 +101,23 @@ class HFSpecWorker(SpecWorker):
     ) -> Tuple[torch.LongTensor]:
         hf_kwargs = self._extract_hf_inputs(execute_model_req)
         
-        grad_magnitudes = getattr(
+        token_importance = getattr(
             self, 
-            f"_compute_grad_magnitudes_by_{self.spec_config.grad_algo}")(**hf_kwargs)
+            f"_compute_token_importance_by_{self.spec_config.algo}"
+        )(**hf_kwargs)
 
         # for each sample we choose the indices
         kept_indices = ()
-        for sample_gm in grad_magnitudes:
-            seq_len = len(sample_gm)
+        for sample_ti in token_importance:
+            seq_len = len(sample_ti)
             assert self.spec_config.keep_strategy == "percentage"
             topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
-            _, indices = torch.topk(sample_gm, k=topk, dim=-1)
+            _, indices = torch.topk(sample_ti, k=topk, dim=-1)
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
         return kept_indices
 
-    def _compute_grad_magnitudes_by_backprop(
+    def _compute_token_importance_by_backprop(
         self, 
         **hf_kwargs
     ) -> Tuple[torch.Tensor]:
