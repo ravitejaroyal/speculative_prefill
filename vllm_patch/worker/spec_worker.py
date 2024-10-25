@@ -176,10 +176,11 @@ class HFSpecWorker(SpecWorker):
         position_ids = []
         seq_lens = []
 
-        for seq_group_metadata in execute_model_req.seq_group_metadata_list:
-            if seq_group_metadata.is_prompt:
-                request_id = seq_group_metadata.request_id
-                prompt_token_ids = seq_group_metadata.seq_data[int(request_id)].prompt_token_ids
+        for metadata in execute_model_req.seq_group_metadata_list:
+            if metadata.is_prompt:
+                assert len(metadata.seq_data) == 1
+                seq_id = metadata.get_first_seq_id()
+                prompt_token_ids = metadata.seq_data[seq_id].prompt_token_ids
                 prompt_len = len(prompt_token_ids)
 
                 input_ids.extend(prompt_token_ids)
