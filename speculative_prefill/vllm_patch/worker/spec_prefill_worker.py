@@ -11,10 +11,12 @@ from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
 
-from vllm_patch.config import SpecConfig
-from vllm_patch.data.input_builder import AugmentedModelInputForGPUBuilder
-from vllm_patch.data.sequence import AugmentedSequenceData
-from vllm_patch.worker.spec_worker import HFSpecWorker, SpecWorker
+from speculative_prefill.vllm_patch.config import SpecConfig
+from speculative_prefill.vllm_patch.data.input_builder import \
+    AugmentedModelInputForGPUBuilder
+from speculative_prefill.vllm_patch.data.sequence import AugmentedSequenceData
+from speculative_prefill.vllm_patch.worker.spec_worker import (HFSpecWorker,
+                                                               SpecWorker)
 
 
 def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":

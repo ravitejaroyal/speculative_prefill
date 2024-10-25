@@ -1,4 +1,5 @@
-from vllm_patch.executor.gpu_executor import PatchedGPUExecutor
+from speculative_prefill.vllm_patch.executor.gpu_executor import \
+    PatchedGPUExecutor
 
 
 def patch_executor():

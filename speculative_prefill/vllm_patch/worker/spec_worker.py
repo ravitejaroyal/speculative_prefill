@@ -9,8 +9,8 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.sequence import ExecuteModelRequest
 
-from vllm_patch.config import SpecConfig
-from vllm_patch.data.sequence import AugmentedSequenceData
+from speculative_prefill.vllm_patch.config import SpecConfig
+from speculative_prefill.vllm_patch.data.sequence import AugmentedSequenceData
 
 
 class SpecWorker:

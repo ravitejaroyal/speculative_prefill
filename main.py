@@ -1,4 +1,4 @@
-from vllm_patch import enable_prefill_spec
+from speculative_prefill import enable_prefill_spec
 
 # monkey patch must be placed before everything
 enable_prefill_spec(

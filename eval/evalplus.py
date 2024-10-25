@@ -1,4 +1,4 @@
-from vllm_patch import enable_prefill_spec
+from speculative_prefill import enable_prefill_spec
 
 enable_prefill_spec(
     spec_model='meta-llama/Llama-3.2-1B-Instruct', 

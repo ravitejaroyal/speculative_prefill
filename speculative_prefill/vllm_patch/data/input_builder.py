@@ -3,7 +3,7 @@ from vllm.model_executor.layers.rotary_embedding import MRotaryEmbedding
 from vllm.sequence import SequenceGroupMetadata
 from vllm.worker.model_runner import ModelInputForGPUBuilder
 
-from vllm_patch.data.sequence import AugmentedSequenceData
+from speculative_prefill.vllm_patch.data.sequence import AugmentedSequenceData
 
 
 class AugmentedModelInputForGPUBuilder(ModelInputForGPUBuilder):

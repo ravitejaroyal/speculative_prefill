@@ -1,9 +1,9 @@
 import os
 from typing import Optional
 
-from vllm_patch.data import patch_data
-from vllm_patch.executor import patch_executor
-from vllm_patch.worker import patch_worker
+from speculative_prefill.vllm_patch.data import patch_data
+from speculative_prefill.vllm_patch.executor import patch_executor
+from speculative_prefill.vllm_patch.worker import patch_worker
 
 _TITLE = """
 |=========================================================================================|
