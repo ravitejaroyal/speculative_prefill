@@ -13,7 +13,8 @@ from vllm.scripts import main
         --dtype auto \
         --max-model-len 32768 \
         --gpu-memory-utilization 0.8 \
-        --enable-chunked-prefill=False
+        --enable-chunked-prefill=False \
+        --api-key local_server
 """
 
 if __name__ == "__main__":    
