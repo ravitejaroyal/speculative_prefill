@@ -12,6 +12,7 @@ class SpecConfig:
     gradient_checkpointing: bool = True
     algo: str = "backprop"
     do_profile: bool = False
+    use_sub_space: int = -1
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):
