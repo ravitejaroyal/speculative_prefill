@@ -130,12 +130,22 @@ class HFSpecWorker(SpecWorker):
         last_token_pos = hf_kwargs.pop("last_token_pos")
 
         with torch.enable_grad():
-            inputs_embeds: torch.Tensor = self.model.model.embed_tokens(
+            _inputs_embeds: torch.Tensor = self.model.model.embed_tokens(
                 hf_kwargs.pop("input_ids")
             )
-            
-            inputs_embeds.requires_grad_(True)
-            inputs_embeds.retain_grad()
+
+            if self.spec_config.use_sub_space > 0:
+                sub_inputs_embeds = torch.split(_inputs_embeds, [
+                    self.spec_config.use_sub_space, 
+                    self.model.config.hidden_size - self.spec_config.use_sub_space
+                ], dim=-1)
+                sub_inputs_embeds[0].requires_grad_(True)
+                sub_inputs_embeds[0].retain_grad()
+                inputs_embeds = torch.concat(sub_inputs_embeds, dim=-1)
+            else:
+                _inputs_embeds.requires_grad_(True)
+                _inputs_embeds.retain_grad()
+                inputs_embeds = _inputs_embeds
 
             output: CausalLMOutputWithPast = self.model.forward(
                 inputs_embeds=inputs_embeds, 
@@ -158,7 +168,10 @@ class HFSpecWorker(SpecWorker):
             # backward and get gradients
             loss.backward()
             # embeds grad
-            grads = inputs_embeds.grad
+            if self.spec_config.use_sub_space > 0:
+                grads = sub_inputs_embeds[0].grad
+            else:
+                grads = inputs_embeds.grad
 
         # [total_token_cnt]
         grad_magnitudes = torch.linalg.vector_norm(grads, dim=-1).view(-1)
