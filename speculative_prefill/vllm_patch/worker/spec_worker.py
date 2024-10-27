@@ -77,7 +77,7 @@ class HFSpecWorker(SpecWorker):
         self.model: Optional[LlamaForCausalLM] = None
 
         self.spec_config = SpecConfig.from_path(
-            os.environ.get("spec_config_path", None)
+            os.environ.get("SPEC_CONFIG_PATH", None)
         )
 
         print("\033[92m{}\033[00m".format(

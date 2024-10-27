@@ -36,9 +36,9 @@ def enable_prefill_spec(
 ):
     print(_TITLE)
     print("Setting up environment vars...")
-    os.environ["spec_model"] = spec_model
+    os.environ.setdefault("SPEC_MODEL", spec_model)
     if spec_config_path is not None:
-        os.environ["spec_config_path"] = spec_config_path
+        os.environ.setdefault("SPEC_CONFIG_PATH", spec_config_path)
 
     print("Applying speculative prefill vllm monkey patch...")
     patch_executor()

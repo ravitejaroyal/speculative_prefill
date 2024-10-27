@@ -20,7 +20,7 @@ from speculative_prefill.vllm_patch.worker.spec_worker import (HFSpecWorker,
 
 
 def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
-    spec_model_name = os.environ.get("spec_model", None)
+    spec_model_name = os.environ.get("SPEC_MODEL", None)
     assert spec_model_name is not None
 
     assert kwargs["scheduler_config"].chunked_prefill_enabled == False, \
