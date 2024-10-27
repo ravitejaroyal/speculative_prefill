@@ -4,4 +4,5 @@ python -m speculative_prefill.scripts serve \
     --max-model-len 32768 \
     --gpu-memory-utilization 0.8 \
     --enable-chunked-prefill=False \
+    --enforce-eager True \
     --api-key local_server
