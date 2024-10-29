@@ -100,6 +100,12 @@ class HFSpecWorker(SpecWorker):
                 self.model.gradient_checkpointing_enable()
                 self.model.model.training = True
 
+            if self.spec_config.algo == "attn":
+                # patch for enabling attn outputs
+                from speculative_prefill.vllm_patch.models.llama import \
+                    enable_fa2_output_attns
+                self.model = enable_fa2_output_attns(self.model, self.spec_config)
+
     def _speculate_indices(
         self, 
         execute_model_req: ExecuteModelRequest | None = None
@@ -121,6 +127,36 @@ class HFSpecWorker(SpecWorker):
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
         return kept_indices
+
+    def _compute_token_importance_by_attn(
+        self, 
+        **hf_kwargs
+    ) -> Tuple[torch.Tensor]:
+        hf_kwargs.pop("seq_lens")
+        hf_kwargs.pop("last_token_pos")
+
+        output: CausalLMOutputWithPast = self.model.forward(
+            hf_kwargs.pop("input_ids"), 
+            use_cache=False, 
+            output_attentions=True,             
+            return_dict=True, 
+            **hf_kwargs
+        )
+
+        attn_weights = output.attentions
+        
+        agg_attns = []
+
+        for sample_idx in range(len(attn_weights[0])):
+            # [num of layers, head, 1, seqlen]
+            all_layer_attns = torch.concatenate([aw[sample_idx] for aw in attn_weights], dim=0)
+            # max over heads
+            all_layer_attns = all_layer_attns.max(1)[0]
+            # average over layers
+            attns = all_layer_attns.mean(0).view(-1)
+            agg_attns.append(attns)
+
+        return tuple(agg_attns)
 
     def _compute_token_importance_by_backprop(
         self, 
