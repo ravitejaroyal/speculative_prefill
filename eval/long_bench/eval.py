@@ -54,7 +54,10 @@ def scorer_e(dataset, predictions, answers, lengths, all_classes):
         else:
             scores["8k+"].append(score)
     for key in scores.keys():
-        scores[key] = round(100 * np.mean(scores[key]), 2)
+        if len(scores[key]) == 0:
+            scores[key] = -1
+        else:
+            scores[key] = round(100 * np.mean(scores[key]), 2)
     return scores
 
 def scorer(dataset, predictions, answers, all_classes):
