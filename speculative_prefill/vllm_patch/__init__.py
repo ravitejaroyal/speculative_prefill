@@ -1,5 +1,9 @@
+import atexit
 import os
 from typing import Optional
+
+import torch
+import torch.distributed
 
 from speculative_prefill.vllm_patch.data import patch_data
 from speculative_prefill.vllm_patch.executor import patch_executor
@@ -44,3 +48,7 @@ def enable_prefill_spec(
     patch_executor()
     patch_worker()
     patch_data()
+
+    atexit.register(
+        lambda : torch.distributed.destroy_process_group()
+    )
