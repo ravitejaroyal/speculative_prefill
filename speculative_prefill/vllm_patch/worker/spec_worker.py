@@ -242,8 +242,8 @@ class HFSpecWorker(SpecWorker):
         last_token_pos = torch.cumsum(seq_lens, dim=-1) - 1
 
         return {
-            "input_ids": input_ids.unsqueeze(0), 
-            "position_ids": position_ids.unsqueeze(0), 
+            "input_ids": input_ids.unsqueeze(0).cuda(), 
+            "position_ids": position_ids.unsqueeze(0).cuda(), 
             "seq_lens": seq_lens, 
             "last_token_pos": last_token_pos
         }
