@@ -19,8 +19,9 @@ def parse_args(args=None):
     ])
     parser.add_argument('--spec-prefill', action='store_true', help="Whether to use speculative prefill")
     parser.add_argument('--exp', type=str, default=None, help="Experiment name. ")
-    parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E")
-    
+    parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E. ")
+    parser.add_argument('--no-8k', action='store_true', help="Exclude >8k samples. ")
+
     # vLLM args
     parser.add_argument('--tensor-parallel-size', type=int, default=1)
     parser.add_argument('--gpu-memory-utilization', type=float, default=0.8)
@@ -49,6 +50,8 @@ def get_predictions(
     print(f"Evaluating {dataset_name} with {len(data)} samples...")
 
     for json_obj in tqdm(data):
+        if json_obj["length"] >= 8000:
+            continue
         prompt = prompt_format.format(**json_obj)
         if dataset_name in ["trec", "triviaqa", "samsum", "lsht", "lcc", "repobench-p"]:
             # no template
@@ -83,6 +86,9 @@ if __name__ == "__main__":
     seed_everything(227)
     args = parse_args()
 
+    if args.no_8k:
+        assert args.e, "No 8k is only supported for e dataset. "
+
     if args.spec_prefill:
         sys.path.append("../../")
         from speculative_prefill import enable_prefill_spec
@@ -101,15 +107,20 @@ if __name__ == "__main__":
         tokenizer='meta-llama/Meta-Llama-3.1-8B-Instruct', 
         gpu_memory_utilization=args.gpu_memory_utilization, 
         tensor_parallel_size=args.tensor_parallel_size,
-        max_model_len=32768, 
+        max_model_len=65536, # this will include all examples in long bench
         enforce_eager=True, 
         enable_chunked_prefill=False, 
     )
 
     # build dataset
     if args.e:
-        datasets = ["qasper", "multifieldqa_en", "hotpotqa", "2wikimqa", "gov_report", "multi_news", \
-            "trec", "triviaqa", "samsum", "passage_count", "passage_retrieval_en", "lcc", "repobench-p"]
+        if args.no_8k:
+            # get rid of triviaqa and lcc
+            datasets = ["qasper", "multifieldqa_en", "hotpotqa", "2wikimqa", "gov_report", "multi_news", \
+            "trec", "samsum", "passage_count", "passage_retrieval_en", "repobench-p"]
+        else:    
+            datasets = ["qasper", "multifieldqa_en", "hotpotqa", "2wikimqa", "gov_report", "multi_news", \
+                "trec", "triviaqa", "samsum", "passage_count", "passage_retrieval_en", "lcc", "repobench-p"]
     else:
         datasets = ["narrativeqa", "qasper", "multifieldqa_en", "multifieldqa_zh", "hotpotqa", "2wikimqa", "musique", \
                     "dureader", "gov_report", "qmsum", "multi_news", "vcsum", "trec", "triviaqa", "samsum", "lsht", \
