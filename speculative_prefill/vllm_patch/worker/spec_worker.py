@@ -5,7 +5,8 @@ from typing import Dict, Optional, Tuple
 
 import torch
 from transformers import LlamaForCausalLM, LlamaModel
-from transformers.modeling_outputs import BaseModelOutputWithPast
+from transformers.modeling_outputs import (BaseModelOutputWithPast,
+                                           CausalLMOutputWithPast)
 from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.sequence import ExecuteModelRequest
 
