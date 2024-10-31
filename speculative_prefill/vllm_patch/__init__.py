@@ -28,7 +28,7 @@ _TITLE = """
 |=========================================================================================|
 | Notes:                                                                                  |
 |    - Currently only support Llama model as the base and speculator.                     |
-|    - Currently does not support chunked prefill, use enable_chunked_prefill=False     |
+|    - Currently does not support chunked prefill, use enable_chunked_prefill=False       |
 |    - Recommend to set gpu_memory_utilization when using tensor_parallel_size > 1        |
 |    - Please use enforce_eager=True, which makes long context task correct.              |
 |=========================================================================================|

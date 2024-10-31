@@ -1,6 +1,7 @@
 import math
 import os
 from abc import abstractmethod
+from importlib.util import spec_from_loader
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -12,6 +13,8 @@ from vllm.sequence import ExecuteModelRequest
 
 from speculative_prefill.vllm_patch.config import SpecConfig
 from speculative_prefill.vllm_patch.data.sequence import AugmentedSequenceData
+from speculative_prefill.vllm_patch.models.llama import (
+    enable_fa2_output_attns, visualize_attns)
 
 
 class SpecWorker:
@@ -99,9 +102,7 @@ class HFSpecWorker(SpecWorker):
                 param.requires_grad_(False)
 
             if self.spec_config.algo == "attn":
-                # patch for enabling attn outputs
-                from speculative_prefill.vllm_patch.models.llama import \
-                    enable_fa2_output_attns
+                # patch for enabling attn outputs                
                 self.model = enable_fa2_output_attns(self.model, self.spec_config)
             else:
                 if self.spec_config.gradient_checkpointing and \
@@ -150,6 +151,19 @@ class HFSpecWorker(SpecWorker):
 
         attn_weights = output.attentions
         
+        if self.spec_config.algo_kwargs.get("visualize", False):
+            visualize_attns(
+                attns=attn_weights, 
+                save_path=self.spec_config.algo_kwargs.get(
+                    "visualize_save_path", 
+                    "./local/attn_vis.png"
+                ), 
+                merge_heads=self.spec_config.algo_kwargs.get(
+                    "merge_heads", 
+                    True
+                )
+            )
+
         agg_attns = []
 
         for sample_idx in range(len(attn_weights[0])):
@@ -175,7 +189,7 @@ class HFSpecWorker(SpecWorker):
                 hf_kwargs.pop("input_ids")
             )
 
-            if self.spec_config.use_sub_space > 0:
+            if self.spec_config.algo_kwargs.get("use_sub_space") > 0:
                 sub_inputs_embeds = torch.split(_inputs_embeds, [
                     self.spec_config.use_sub_space, 
                     self.model.config.hidden_size - self.spec_config.use_sub_space
@@ -209,7 +223,7 @@ class HFSpecWorker(SpecWorker):
             # backward and get gradients
             loss.backward()
             # embeds grad
-            if self.spec_config.use_sub_space > 0:
+            if self.spec_config.algo_kwargs.get("use_sub_space") > 0:
                 grads = sub_inputs_embeds[0].grad
             else:
                 grads = inputs_embeds.grad

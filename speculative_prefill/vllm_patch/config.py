@@ -11,8 +11,8 @@ class SpecConfig:
     keep_kwargs: Optional[Dict[str, Any]] = None
     gradient_checkpointing: bool = True
     algo: str = "backprop"
+    algo_kwargs: Optional[Dict[str, Any]] = None
     do_profile: bool = False
-    use_sub_space: int = -1
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):
@@ -43,3 +43,6 @@ class SpecConfig:
         if self.keep_strategy is None:
             self.keep_strategy = "percentage"
             self.keep_kwargs["percentage"] = 0.5
+
+        if self.algo_kwargs is None:
+            self.algo_kwargs = {}
