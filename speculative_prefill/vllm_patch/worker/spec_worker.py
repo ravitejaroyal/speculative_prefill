@@ -4,8 +4,8 @@ from abc import abstractmethod
 from typing import Dict, Optional, Tuple
 
 import torch
-from transformers import LlamaForCausalLM
-from transformers.modeling_outputs import CausalLMOutputWithPast
+from transformers import LlamaForCausalLM, LlamaModel
+from transformers.modeling_outputs import BaseModelOutputWithPast
 from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.sequence import ExecuteModelRequest
 
@@ -85,7 +85,9 @@ class HFSpecWorker(SpecWorker):
 
     def load_model(self):
         if get_tensor_model_parallel_rank() == 0:
-            self.model = LlamaForCausalLM.from_pretrained(
+            model_cls = LlamaForCausalLM \
+                if self.spec_config.algo == "backprop" else LlamaModel
+            self.model = model_cls.from_pretrained(
                 self.spec_model_name, 
                 torch_dtype=torch.bfloat16, 
                 device_map="auto", 
@@ -95,16 +97,16 @@ class HFSpecWorker(SpecWorker):
             for param in self.model.parameters():
                 param.requires_grad_(False)
 
-            if self.spec_config.gradient_checkpointing and \
-                not self.model.model.gradient_checkpointing:
-                self.model.gradient_checkpointing_enable()
-                self.model.model.training = True
-
             if self.spec_config.algo == "attn":
                 # patch for enabling attn outputs
                 from speculative_prefill.vllm_patch.models.llama import \
                     enable_fa2_output_attns
                 self.model = enable_fa2_output_attns(self.model, self.spec_config)
+            else:
+                if self.spec_config.gradient_checkpointing and \
+                not self.model.model.gradient_checkpointing:
+                    self.model.gradient_checkpointing_enable()
+                    self.model.model.training = True
 
     def _speculate_indices(
         self, 
@@ -128,6 +130,7 @@ class HFSpecWorker(SpecWorker):
 
         return kept_indices
 
+    @torch.inference_mode
     def _compute_token_importance_by_attn(
         self, 
         **hf_kwargs
@@ -135,7 +138,8 @@ class HFSpecWorker(SpecWorker):
         hf_kwargs.pop("seq_lens")
         hf_kwargs.pop("last_token_pos")
 
-        output: CausalLMOutputWithPast = self.model.forward(
+        # use the base model to avoid the LM head
+        output: BaseModelOutputWithPast = self.model.forward(
             hf_kwargs.pop("input_ids"), 
             use_cache=False, 
             output_attentions=True,             
@@ -242,8 +246,8 @@ class HFSpecWorker(SpecWorker):
         last_token_pos = torch.cumsum(seq_lens, dim=-1) - 1
 
         return {
-            "input_ids": input_ids.unsqueeze(0).cuda(), 
-            "position_ids": position_ids.unsqueeze(0).cuda(), 
+            "input_ids": input_ids.unsqueeze(0).to(self.model.device), 
+            "position_ids": position_ids.unsqueeze(0).cuda(self.model.device), 
             "seq_lens": seq_lens, 
             "last_token_pos": last_token_pos
         }

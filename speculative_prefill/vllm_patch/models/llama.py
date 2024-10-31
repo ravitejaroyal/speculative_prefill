@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
-from transformers import LlamaForCausalLM
+from transformers import LlamaForCausalLM, LlamaModel
 from transformers.cache_utils import Cache, StaticCache
 from transformers.models.llama.modeling_llama import (LlamaAttention,
                                                       _flash_attention_forward,
@@ -153,9 +153,12 @@ def _custom_forward(
     return attn_output, attn_weights, past_key_value
 
 
-def enable_fa2_output_attns(model: LlamaForCausalLM, spec_config: SpecConfig):
+def enable_fa2_output_attns(
+    model: LlamaModel, 
+    spec_config: SpecConfig
+) -> LlamaModel:
     for layer_idx in range(model.config.num_hidden_layers):
-        self_attn: LlamaAttention = model.model.layers[layer_idx].self_attn
+        self_attn: LlamaAttention = model.layers[layer_idx].self_attn
         self_attn.forward = MethodType(
             functools.partial(
                 _custom_forward, 
