@@ -38,7 +38,7 @@ class SpecConfig:
     
     def __post_init__(self):
         assert self.keep_strategy in ["adaptive", "percentage"]
-        assert self.algo in ["backprop", "attn"]
+        assert self.algo in ["backprop", "attn", "attn_lah"]
 
         if self.keep_strategy is None:
             self.keep_strategy = "percentage"

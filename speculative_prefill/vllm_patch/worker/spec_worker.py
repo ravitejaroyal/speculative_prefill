@@ -5,6 +5,7 @@ from typing import Dict, Optional, Tuple
 
 import torch
 from transformers import LlamaForCausalLM, LlamaModel
+from transformers.generation.utils import GenerateDecoderOnlyOutput
 from transformers.modeling_outputs import (BaseModelOutputWithPast,
                                            CausalLMOutputWithPast)
 from vllm.distributed import get_tensor_model_parallel_rank
@@ -88,8 +89,8 @@ class HFSpecWorker(SpecWorker):
 
     def load_model(self):
         if get_tensor_model_parallel_rank() == 0:
-            model_cls = LlamaForCausalLM \
-                if self.spec_config.algo == "backprop" else LlamaModel
+            model_cls = LlamaModel \
+                if self.spec_config.algo == "attn" else LlamaForCausalLM
             self.model = model_cls.from_pretrained(
                 self.spec_model_name, 
                 torch_dtype=torch.bfloat16, 
@@ -100,7 +101,7 @@ class HFSpecWorker(SpecWorker):
             for param in self.model.parameters():
                 param.requires_grad_(False)
 
-            if self.spec_config.algo == "attn":
+            if self.spec_config.algo.startswith("attn"):
                 # patch for enabling attn outputs                
                 self.model = enable_fa2_output_attns(self.model, self.spec_config)
             else:
@@ -177,6 +178,55 @@ class HFSpecWorker(SpecWorker):
             agg_attns.append(attns)
 
         return tuple(agg_attns)
+
+    @torch.inference_mode
+    def _compute_token_importance_by_attn_lah(
+         self, 
+        **hf_kwargs
+    ) -> Tuple[torch.Tensor]:
+        seq_lens = hf_kwargs.pop("seq_lens")
+        _ = hf_kwargs.pop("last_token_pos")   
+        
+        assert len(seq_lens) == 1, "Currently look ahead only supports bs = 1."
+        
+        input_ids = hf_kwargs.pop("input_ids")
+        output: GenerateDecoderOnlyOutput = self.model.generate(
+            input_ids=input_ids, 
+            attention_mask=torch.ones_like(input_ids), 
+            use_cache=True, 
+            output_attentions=True,             
+            return_dict_in_generate=True, 
+            return_legacy_cache=False, 
+            do_sample=False, 
+            eos_token_id=128009, 
+            pad_token_id=128009, 
+            temperature=None, 
+            top_p=None, 
+            max_new_tokens=self.spec_config.algo_kwargs.get("lah_cnt", 4)
+        )
+
+        all_attns = []
+        prefill_len = seq_lens[0]
+        attentions = output.attentions
+
+        for token_pos in range(len(attentions)):
+            # Tuple[B, H, 1, K]
+            attn = attentions[token_pos]
+            # [layer_cnt, B, H, 1, K]
+            attn = torch.stack(attn, dim=0)
+            # [layer_cnt, B, prefill_len]
+            attn = attn.max(dim=2)[0][..., :prefill_len].squeeze(-2).squeeze(-2)
+            # normalize
+            attn = torch.nn.functional.softmax(attn, dim=-1)
+            # max over layers
+            attn = torch.max(attn, dim=0)[0]
+            # aggregate
+            all_attns.append(attn)
+
+        all_attns = torch.max(torch.stack(all_attns, dim=0), dim=0)[0]
+        # all_attns = torch.stack(all_attns, dim=0).mean(0)
+
+        return (all_attns, )
 
     def _compute_token_importance_by_backprop(
         self, 

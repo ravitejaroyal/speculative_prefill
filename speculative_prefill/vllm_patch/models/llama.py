@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 import torch.nn as nn
-from transformers import LlamaModel
+from transformers import LlamaForCausalLM, LlamaModel
 from transformers.cache_utils import Cache, StaticCache
 from transformers.models.llama.modeling_llama import (LlamaAttention,
                                                       _flash_attention_forward,
@@ -36,6 +36,8 @@ def _custom_forward(
     """
         monkey patch on outputing the desired attention behaviors
     """
+    assert spec_config is not None
+
     if isinstance(past_key_value, StaticCache):
         raise ValueError(
             "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
@@ -73,33 +75,45 @@ def _custom_forward(
         key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     if output_attentions:
-        assert position_ids is not None
-        assert attention_mask is None
-        """
-            pos_ids: [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 0, 0]
-            last_token_mask: 
-                - [T, F, F, F, T, F, F, F, T, F, T, T]
-                - [F, F, F, T, F, F, F, T, F, T, T, T]
-        """
-        last_token_mask = (position_ids == 0).view(-1)
-        last_token_mask = torch.nn.functional.pad(
-            last_token_mask[1:], (0, 1), value=1.0).to(torch.bool)
-        seq_lens = torch.nonzero((last_token_mask == True)).view(-1)
-        seq_lens = torch.cat([seq_lens[:1] + 1, seq_lens[1:] - seq_lens[:-1]], dim=-1)
-        
-        # size will be [1, head, seqlen, head_dim]
-        keys = repeat_kv(key_states, self.num_key_value_groups)
-        keys = torch.split(keys, seq_lens.tolist(), dim=-2)
-        # size will be [1, head, seqlen, head_dim]
-        querys = query_states[:, :, last_token_mask, :]
+        if spec_config.algo == "attn":
+            assert position_ids is not None
+            assert attention_mask is None
+            """
+                pos_ids: [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 0, 0]
+                last_token_mask: 
+                    - [T, F, F, F, T, F, F, F, T, F, T, T]
+                    - [F, F, F, T, F, F, F, T, F, T, T, T]
+            """
+            last_token_mask = (position_ids == 0).view(-1)
+            last_token_mask = torch.nn.functional.pad(
+                last_token_mask[1:], (0, 1), value=1.0).to(torch.bool)
+            seq_lens = torch.nonzero((last_token_mask == True)).view(-1)
+            seq_lens = torch.cat([seq_lens[:1] + 1, seq_lens[1:] - seq_lens[:-1]], dim=-1)
+            
+            # size will be [1, head, seqlen, head_dim]
+            keys = repeat_kv(key_states, self.num_key_value_groups)
+            keys = torch.split(keys, seq_lens.tolist(), dim=-2)
+            # size will be [1, head, seqlen, head_dim]
+            querys = query_states[:, :, last_token_mask, :]
 
-        # compute attn weights per sample
-        attn_weights = []
-        for sample_idx, key in enumerate(keys):
-            query = querys[:, :, sample_idx, :].unsqueeze(-2)
-            attn = torch.matmul(query, key.transpose(2, 3)) / math.sqrt(self.head_dim)
-            attn = nn.functional.softmax(attn, dim=-1, dtype=torch.float32).to(querys.dtype)
-            attn_weights.append(attn)
+            # compute attn weights per sample
+            attn_weights = []
+            for sample_idx, key in enumerate(keys):
+                query = querys[:, :, sample_idx, :].unsqueeze(-2)
+                attn = torch.matmul(query, key.transpose(2, 3)) / math.sqrt(self.head_dim)
+                attn = nn.functional.softmax(attn, dim=-1, dtype=torch.float32).to(querys.dtype)
+                attn_weights.append(attn)
+        elif spec_config.algo == "attn_lah":
+            assert attention_mask is None
+            # we dont need all but just the last for each forward
+            # we just need [B, H, Q, K] and Q can be 1
+            # [B, head, seqlen, head_dim]
+            keys = repeat_kv(key_states, self.num_key_value_groups)
+            # [B, head, 1, head_dim]
+            querys = query_states[..., -1:, :]
+            attn_weights = torch.matmul(querys, keys.transpose(2, 3)) / math.sqrt(self.head_dim)
+        else:
+            raise ValueError
     else:
         attn_weights = None
 
@@ -156,11 +170,15 @@ def _custom_forward(
 
 
 def enable_fa2_output_attns(
-    model: LlamaModel, 
+    model: LlamaModel | LlamaForCausalLM, 
     spec_config: SpecConfig
 ) -> LlamaModel:
-    for layer_idx in range(model.config.num_hidden_layers):
-        self_attn: LlamaAttention = model.layers[layer_idx].self_attn
+    if isinstance(model, LlamaForCausalLM):
+        _model = model.model
+    else:
+        _model = model
+    for layer_idx in range(_model.config.num_hidden_layers):
+        self_attn: LlamaAttention = _model.layers[layer_idx].self_attn
         self_attn.forward = MethodType(
             functools.partial(
                 _custom_forward, 
