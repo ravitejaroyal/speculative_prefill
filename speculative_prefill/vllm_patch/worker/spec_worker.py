@@ -223,8 +223,7 @@ class HFSpecWorker(SpecWorker):
             # aggregate
             all_attns.append(attn)
 
-        all_attns = torch.max(torch.stack(all_attns, dim=0), dim=0)[0]
-        # all_attns = torch.stack(all_attns, dim=0).mean(0)
+        all_attns = torch.stack(all_attns, dim=0).mean(0)
 
         return (all_attns, )
 
