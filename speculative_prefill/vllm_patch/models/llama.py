@@ -188,18 +188,27 @@ def visualize_attns(
         "Currently only support seqlen <= 2k."
 
     if merge_heads:
+        fig, axes = plt.subplots(2, 1, figsize=(12, 12))
+        fig.suptitle(f"Attn Visualization ({merge_fn} over heads)")
+
         if merge_fn == "max":
-            avg_attns = all_layer_attns.max(1)[0]
+            merged_attns = all_layer_attns.max(1)[0]
         elif merge_fn == "mean":
-            avg_attns = all_layer_attns.mean(1)
+            merged_attns = all_layer_attns.mean(1)
         elif merge_fn == "sum":
-            avg_attns = all_layer_attns.sum(1)
+            merged_attns = all_layer_attns.sum(1)
         else:
             raise ValueError
-        sns.heatmap(avg_attns)
-        plt.title(f"Attn Visualization ({merge_fn} over heads)")
-        plt.ylabel("Layer idx")
-        plt.xlabel("Position id")
+
+        sns.heatmap(merged_attns, ax=axes[0])
+        axes[0].set_ylabel("Layer idx")
+        axes[0].set_xlabel("Position id")
+
+        sns.barplot(merged_attns.max(0)[0], ax=axes[1])
+        axes[1].set_ylabel("Aggregated score")
+        axes[1].set_xlabel("Position id")
+
+        plt.tight_layout()
     else:
         num_of_heads = 4 # the first 4 for now
         
@@ -215,3 +224,4 @@ def visualize_attns(
 
     print(f"Saving attn visualization to {visualize_save_path}...")
     plt.savefig(visualize_save_path, dpi=300)
+    exit()
