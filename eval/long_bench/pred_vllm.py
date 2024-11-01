@@ -45,12 +45,13 @@ def get_predictions(
     data, 
     prompt_format, 
     dataset_name, 
-    output_path
+    output_path, 
+    no_8k
 ):
     print(f"Evaluating {dataset_name} with {len(data)} samples...")
 
     for json_obj in tqdm(data):
-        if json_obj["length"] >= 8000:
+        if no_8k and json_obj["length"] >= 8000:
             continue
         prompt = prompt_format.format(**json_obj)
         if dataset_name in ["trec", "triviaqa", "samsum", "lsht", "lcc", "repobench-p"]:
@@ -161,7 +162,8 @@ if __name__ == "__main__":
             data=data_all, 
             prompt_format=prompt_format, 
             dataset_name=dataset_name, 
-            output_path=output_path
+            output_path=output_path, 
+            no_8k=args.no_8k
         )
 
     if not args.spec_prefill:
