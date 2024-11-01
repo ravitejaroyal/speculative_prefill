@@ -153,14 +153,7 @@ class HFSpecWorker(SpecWorker):
         if self.spec_config.algo_kwargs.get("visualize", False):
             visualize_attns(
                 attns=attn_weights, 
-                save_path=self.spec_config.algo_kwargs.get(
-                    "visualize_save_path", 
-                    "./local/attn_vis.png"
-                ), 
-                merge_heads=self.spec_config.algo_kwargs.get(
-                    "merge_heads", 
-                    True
-                )
+                **self.spec_config.algo_kwargs
             )
 
         agg_attns = []
@@ -171,7 +164,16 @@ class HFSpecWorker(SpecWorker):
             # max over heads
             all_layer_attns = all_layer_attns.max(1)[0]
             # average over layers
-            attns = all_layer_attns.mean(0).view(-1)
+            merge_fn = self.spec_config.algo_kwargs.get("merge_fn", "max")
+            if merge_fn == "max":
+                attns = all_layer_attns.max(0)[0].view(-1)
+            elif merge_fn == "sum":
+                attns = all_layer_attns.sum(0).view(-1)
+            elif merge_fn == "mean":
+                attns = all_layer_attns.mean(0).view(-1)
+            else:
+                raise ValueError
+            
             agg_attns.append(attns)
 
         return tuple(agg_attns)
@@ -188,7 +190,7 @@ class HFSpecWorker(SpecWorker):
                 hf_kwargs.pop("input_ids")
             )
 
-            if self.spec_config.algo_kwargs.get("use_sub_space") > 0:
+            if self.spec_config.algo_kwargs.get("use_sub_space", -1) > 0:
                 sub_inputs_embeds = torch.split(_inputs_embeds, [
                     self.spec_config.use_sub_space, 
                     self.model.config.hidden_size - self.spec_config.use_sub_space
@@ -222,7 +224,7 @@ class HFSpecWorker(SpecWorker):
             # backward and get gradients
             loss.backward()
             # embeds grad
-            if self.spec_config.algo_kwargs.get("use_sub_space") > 0:
+            if self.spec_config.algo_kwargs.get("use_sub_space", -1) > 0:
                 grads = sub_inputs_embeds[0].grad
             else:
                 grads = inputs_embeds.grad

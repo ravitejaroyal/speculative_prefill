@@ -172,30 +172,38 @@ def enable_fa2_output_attns(
 
 def visualize_attns(
     attns: Tuple[Tuple[torch.Tensor]], 
-    save_path: str, 
-    merge_heads: bool, 
-    merge_fn: str = "max"
+    visualize_save_path: str = "./local/vis_attn.png", 
+    merge_heads: bool = True, 
+    merge_fn: str = "max", 
+    **kwargs
 ):
-    print(f"Start visualizing attentions")
+    print(f"Start visualizing attentions. ")
     
-    assert len(attns[0]) == 1, "Currently only support sample size == 1 for visualization. "
+    assert len(attns[0]) == 1, \
+        "Currently only support sample size == 1 for visualization."
     # [num of layers, head, seqlen]
     all_layer_attns = torch.concatenate([aw[0] for aw in attns], dim=0).squeeze(-2).cpu().float()
     
+    assert all_layer_attns.shape[-1] <= 2048, \
+        "Currently only support seqlen <= 2k."
+
     if merge_heads:
         if merge_fn == "max":
             avg_attns = all_layer_attns.max(1)[0]
         elif merge_fn == "mean":
             avg_attns = all_layer_attns.mean(1)
+        elif merge_fn == "sum":
+            avg_attns = all_layer_attns.sum(1)
         else:
             raise ValueError
         sns.heatmap(avg_attns)
+        plt.title(f"Attn Visualization ({merge_fn} over heads)")
         plt.ylabel("Layer idx")
         plt.xlabel("Position id")
     else:
         num_of_heads = 4 # the first 4 for now
         
-        fig, axes = plt.subplots(num_of_heads, 1, figsize=(12, 10 * num_of_heads))
+        _, axes = plt.subplots(num_of_heads, 1, figsize=(12, 10 * num_of_heads))
 
         for head_idx in range(num_of_heads):
             head_attns = all_layer_attns[:, head_idx, :]
@@ -205,5 +213,5 @@ def visualize_attns(
             axes[head_idx].set_ylabel("Layer idx")
             axes[head_idx].set_xlabel("Position id")
 
-    print(f"Saving attn visualization to {save_path}...")
-    plt.savefig(save_path, dpi=300)
+    print(f"Saving attn visualization to {visualize_save_path}...")
+    plt.savefig(visualize_save_path, dpi=300)
