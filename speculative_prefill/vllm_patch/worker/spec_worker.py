@@ -125,8 +125,13 @@ class HFSpecWorker(SpecWorker):
         kept_indices = ()
         for sample_ti in token_importance:
             seq_len = len(sample_ti)
-            assert self.spec_config.keep_strategy == "percentage"
-            topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
+            if self.spec_config.keep_strategy == "percentage":
+                topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
+            elif self.spec_config.keep_strategy == "constant":
+                topk = min(seq_len, self.spec_config.keep_kwargs["constant"])
+            elif self.spec_config.keep_strategy == "percentage-lowerbound":
+                topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
+                topk = max(topk, self.spec_config.keep_kwargs["lowerbound"])
             _, indices = torch.topk(sample_ti, k=topk, dim=-1)
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
@@ -159,9 +164,14 @@ class HFSpecWorker(SpecWorker):
 
         agg_attns = []
 
+        layer_start = self.spec_config.algo_kwargs.get("layer_start", None)
+        layer_end = self.spec_config.algo_kwargs.get("layer_end", None)
+
         for sample_idx in range(len(attn_weights[0])):
             # [num of layers, head, 1, seqlen]
             all_layer_attns = torch.concatenate([aw[sample_idx] for aw in attn_weights], dim=0)
+            # take of layers if necessary
+            all_layer_attns = all_layer_attns[layer_start:layer_end]
             # max over heads
             all_layer_attns = all_layer_attns.max(1)[0]
             # average over layers
@@ -209,11 +219,14 @@ class HFSpecWorker(SpecWorker):
         prefill_len = seq_lens[0]
         attentions = output.attentions
 
+        layer_start = self.spec_config.algo_kwargs.get("layer_start", None)
+        layer_end = self.spec_config.algo_kwargs.get("layer_end", None)
+
         for token_pos in range(len(attentions)):
             # Tuple[B, H, 1, K]
             attn = attentions[token_pos]
             # [layer_cnt, B, H, 1, K]
-            attn = torch.stack(attn, dim=0)
+            attn = torch.stack(attn, dim=0)[layer_start:layer_end]
             # [layer_cnt, B, prefill_len]
             attn = attn.max(dim=2)[0][..., :prefill_len].squeeze(-2).squeeze(-2)
             # normalize
@@ -223,9 +236,16 @@ class HFSpecWorker(SpecWorker):
             # aggregate
             all_attns.append(attn)
 
-        all_attns = torch.stack(all_attns, dim=0).mean(0)
+        # aggregate attns over look ahead tokens
+        if self.spec_config.algo_kwargs.get("lah_moving_avg", None) is not None:
+            scores = torch.zeros_like(all_attns[0])
+            factor = self.spec_config.algo_kwargs["lah_moving_avg"]
+            for attn in reversed(all_attns):
+                scores = scores * (1 - factor) + attn * factor
+        else:
+            scores = torch.stack(all_attns, dim=0).mean(0)
 
-        return (all_attns, )
+        return (scores, )
 
     def _compute_token_importance_by_backprop(
         self, 
