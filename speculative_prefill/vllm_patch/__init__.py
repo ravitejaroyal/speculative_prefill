@@ -4,7 +4,6 @@ from typing import Optional
 
 import torch
 import torch.distributed
-from ray import is_initialized
 
 from speculative_prefill.vllm_patch.data import patch_data
 from speculative_prefill.vllm_patch.executor import patch_executor

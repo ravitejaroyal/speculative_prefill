@@ -109,6 +109,8 @@ if __name__ == "__main__":
     engine_args.gpu_memory_utilization = 0.6
     engine_args.enable_chunked_prefill = False
     engine_args.enforce_eager = True
+    engine_args.disable_custom_all_reduce = True
+    engine_args.max_model_len = 32768
 
     engine = AsyncLLMEngine.from_engine_args(engine_args)
 
