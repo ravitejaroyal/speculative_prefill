@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 import torch.distributed
+from ray import is_initialized
 
 from speculative_prefill.vllm_patch.data import patch_data
 from speculative_prefill.vllm_patch.executor import patch_executor
@@ -34,6 +35,10 @@ _TITLE = """
 |=========================================================================================|
 """
 
+def clean_up_fn():
+    if torch.distributed.is_initialized():
+        torch.distributed.destroy_process_group()
+
 def enable_prefill_spec(
     spec_model: str = 'meta-llama/Llama-3.2-1B-Instruct', 
     spec_config_path: Optional[str] = None
@@ -49,6 +54,4 @@ def enable_prefill_spec(
     patch_worker()
     patch_data()
 
-    atexit.register(
-        lambda : torch.distributed.destroy_process_group()
-    )
+    atexit.register(clean_up_fn)
