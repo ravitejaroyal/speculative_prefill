@@ -123,16 +123,28 @@ class HFSpecWorker(SpecWorker):
 
         # for each sample we choose the indices
         kept_indices = ()
-        for sample_ti in token_importance:
+        for sample_ti in token_importance: 
             seq_len = len(sample_ti)
-            if self.spec_config.keep_strategy == "percentage":
-                topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
-            elif self.spec_config.keep_strategy == "constant":
-                topk = min(seq_len, self.spec_config.keep_kwargs["constant"])
-            elif self.spec_config.keep_strategy == "percentage-lowerbound":
-                topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
-                topk = max(topk, self.spec_config.keep_kwargs["lowerbound"])
-            _, indices = torch.topk(sample_ti, k=topk, dim=-1)
+            if self.spec_config.keep_kwargs.get("chunk", False):
+                chunk_size = self.spec_config.keep_kwargs.get("chunk_size", 32)
+                chunk_ti = torch.split(sample_ti, chunk_size, dim=-1)
+                chunk_ti = [cti.mean() for cti in chunk_ti]
+                chunk_cnt = len(chunk_ti)
+                assert self.spec_config.keep_strategy == "percentage"
+                keep_chunk_cnt = math.ceil(chunk_cnt * self.spec_config.keep_kwargs["percentage"])
+                _, chunk_indices = torch.topk(torch.stack(chunk_ti), k=keep_chunk_cnt, dim=-1)
+                indices = torch.split(torch.arange(seq_len), chunk_size, dim=-1)
+                indices = torch.concat([indices[ci.item()] for ci in chunk_indices])
+            else:
+                if self.spec_config.keep_strategy == "percentage":
+                    topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
+                elif self.spec_config.keep_strategy == "constant":
+                    topk = min(seq_len, self.spec_config.keep_kwargs["constant"])
+                elif self.spec_config.keep_strategy == "percentage-lowerbound":
+                    topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
+                    topk = max(topk, self.spec_config.keep_kwargs["lowerbound"])
+                _, indices = torch.topk(sample_ti, k=topk, dim=-1)
+            
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
         return kept_indices
@@ -177,12 +189,13 @@ class HFSpecWorker(SpecWorker):
             # smooth out attn
             kernel_size = self.spec_config.algo_kwargs.get("pool_kernel_size", None)
             if kernel_size:
-                all_layer_attns = torch.nn.functional.avg_pool1d(
-                    all_layer_attns, 
-                    kernel_size=kernel_size, 
-                    padding=kernel_size // 2,
-                    stride=1
-                )
+                for _ in range(self.spec_config.algo_kwargs.get("pool_num", 1)):
+                    all_layer_attns = torch.nn.functional.avg_pool1d(
+                        all_layer_attns, 
+                        kernel_size=kernel_size, 
+                        padding=kernel_size // 2,
+                        stride=1
+                    )
             # average over layers
             merge_fn = self.spec_config.algo_kwargs.get("merge_fn", "max")
             if merge_fn == "max":
@@ -243,12 +256,13 @@ class HFSpecWorker(SpecWorker):
             # smooth it out
             kernel_size = self.spec_config.algo_kwargs.get("pool_kernel_size", None)
             if kernel_size:
-                attn = torch.nn.functional.avg_pool1d(
-                    attn, 
-                    kernel_size=kernel_size, 
-                    padding=kernel_size // 2,
-                    stride=1
-                )
+                for _ in range(self.spec_config.algo_kwargs.get("pool_num", 1)):
+                    attn = torch.nn.functional.avg_pool1d(
+                        attn, 
+                        kernel_size=kernel_size, 
+                        padding=kernel_size // 2,
+                        stride=1
+                    )
             # max over layers
             attn = torch.max(attn, dim=0)[0]
             # aggregate
