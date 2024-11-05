@@ -174,6 +174,15 @@ class HFSpecWorker(SpecWorker):
             all_layer_attns = all_layer_attns[layer_start:layer_end]
             # max over heads
             all_layer_attns = all_layer_attns.max(1)[0]
+            # smooth out attn
+            kernel_size = self.spec_config.algo_kwargs.get("pool_kernel_size", None)
+            if kernel_size:
+                all_layer_attns = torch.nn.functional.avg_pool1d(
+                    all_layer_attns, 
+                    kernel_size=kernel_size, 
+                    padding=kernel_size // 2,
+                    stride=1
+                )
             # average over layers
             merge_fn = self.spec_config.algo_kwargs.get("merge_fn", "max")
             if merge_fn == "max":
@@ -231,6 +240,15 @@ class HFSpecWorker(SpecWorker):
             attn = attn.max(dim=2)[0][..., :prefill_len].squeeze(-2).squeeze(-2)
             # normalize
             attn = torch.nn.functional.softmax(attn, dim=-1)
+            # smooth it out
+            kernel_size = self.spec_config.algo_kwargs.get("pool_kernel_size", None)
+            if kernel_size:
+                attn = torch.nn.functional.avg_pool1d(
+                    attn, 
+                    kernel_size=kernel_size, 
+                    padding=kernel_size // 2,
+                    stride=1
+                )
             # max over layers
             attn = torch.max(attn, dim=0)[0]
             # aggregate
