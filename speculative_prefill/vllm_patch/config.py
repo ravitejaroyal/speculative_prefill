@@ -44,5 +44,8 @@ class SpecConfig:
             self.keep_strategy = "percentage"
             self.keep_kwargs["percentage"] = 0.5
 
+        if self.keep_kwargs is None:
+            self.keep_kwargs = {}
+
         if self.algo_kwargs is None:
             self.algo_kwargs = {}

@@ -132,7 +132,9 @@ class HFSpecWorker(SpecWorker):
                 # overwrite the percentage field based on cdf
                 normalized_sample_ti = torch.sort(sample_ti / sample_ti.sum(0), dim=-1, descending=True)[0]
                 approx_cdf = torch.cumsum(normalized_sample_ti, dim=-1)
-                threshold_pos = (approx_cdf > 0.7).nonzero(as_tuple=True)[0][0].item()
+                threshold_pos = (
+                    approx_cdf > self.spec_config.keep_kwargs.get("coverage", 0.8)
+                ).nonzero(as_tuple=True)[0][0].item()
                 percentage = threshold_pos / seq_len
             
             if self.spec_config.keep_kwargs.get("chunk", False):
@@ -149,7 +151,8 @@ class HFSpecWorker(SpecWorker):
                 topk = math.ceil(seq_len * percentage)
                 _, indices = torch.topk(sample_ti, k=topk, dim=-1)
             
-            print(f"Ratio: {len(indices) / seq_len}")
+            if self.spec_config.do_profile:
+                print(f"Ratio: {len(indices) / seq_len}")
 
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
