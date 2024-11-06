@@ -125,26 +125,32 @@ class HFSpecWorker(SpecWorker):
         kept_indices = ()
         for sample_ti in token_importance: 
             seq_len = len(sample_ti)
+            
+            percentage = self.spec_config.keep_kwargs.get("percentage", 1.0)
+
+            if self.spec_config.keep_strategy == "adaptive":
+                # overwrite the percentage field based on cdf
+                normalized_sample_ti = torch.sort(sample_ti / sample_ti.sum(0), dim=-1, descending=True)[0]
+                approx_cdf = torch.cumsum(normalized_sample_ti, dim=-1)
+                threshold_pos = (approx_cdf > 0.7).nonzero(as_tuple=True)[0][0].item()
+                percentage = threshold_pos / seq_len
+            
             if self.spec_config.keep_kwargs.get("chunk", False):
                 chunk_size = self.spec_config.keep_kwargs.get("chunk_size", 32)
                 chunk_ti = torch.split(sample_ti, chunk_size, dim=-1)
                 chunk_ti = [cti.mean() for cti in chunk_ti]
                 chunk_cnt = len(chunk_ti)
-                assert self.spec_config.keep_strategy == "percentage"
-                keep_chunk_cnt = math.ceil(chunk_cnt * self.spec_config.keep_kwargs["percentage"])
+                
+                keep_chunk_cnt = math.ceil(chunk_cnt * percentage)
                 _, chunk_indices = torch.topk(torch.stack(chunk_ti), k=keep_chunk_cnt, dim=-1)
                 indices = torch.split(torch.arange(seq_len), chunk_size, dim=-1)
                 indices = torch.concat([indices[ci.item()] for ci in chunk_indices])
             else:
-                if self.spec_config.keep_strategy == "percentage":
-                    topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
-                elif self.spec_config.keep_strategy == "constant":
-                    topk = min(seq_len, self.spec_config.keep_kwargs["constant"])
-                elif self.spec_config.keep_strategy == "percentage-lowerbound":
-                    topk = math.ceil(seq_len * self.spec_config.keep_kwargs["percentage"])
-                    topk = max(topk, self.spec_config.keep_kwargs["lowerbound"])
+                topk = math.ceil(seq_len * percentage)
                 _, indices = torch.topk(sample_ti, k=topk, dim=-1)
             
+            print(f"Ratio: {len(indices) / seq_len}")
+
             kept_indices = kept_indices + (torch.sort(indices)[0], )
 
         return kept_indices
