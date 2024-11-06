@@ -193,6 +193,7 @@ def visualize_attns(
     visualize_save_path: str = "./local/vis_attn.png", 
     merge_heads: bool = True, 
     merge_fn: str = "max", 
+    plot_cdf: bool = False, 
     **kwargs
 ):
     print(f"Start visualizing attentions. ")
@@ -206,9 +207,6 @@ def visualize_attns(
         "Currently only support seqlen <= 2k."
 
     if merge_heads:
-        fig, axes = plt.subplots(2, 1, figsize=(12, 12))
-        fig.suptitle(f"Attn Visualization ({merge_fn} over heads)")
-
         if merge_fn == "max":
             merged_attns = all_layer_attns.max(1)[0]
         elif merge_fn == "mean":
@@ -217,16 +215,29 @@ def visualize_attns(
             merged_attns = all_layer_attns.sum(1)
         else:
             raise ValueError
+        
+        if plot_cdf:
+            # max over layers
+            merged_attns = merged_attns.max(0)[0]
+            merged_attns = merged_attns / merged_attns.sum(0)
+            cdf = torch.cumsum(torch.sort(merged_attns, descending=True)[0], dim=-1)
+            sns.lineplot(cdf)
+            plt.title("Approximated Cumulative Attn Scores")
+            plt.xlabel("Token cnt")
+            plt.ylabel("Cumulative attn")
+        else:
+            fig, axes = plt.subplots(2, 1, figsize=(12, 12))
+            fig.suptitle(f"Attn Visualization ({merge_fn} over heads)")
 
-        sns.heatmap(merged_attns, ax=axes[0])
-        axes[0].set_ylabel("Layer idx")
-        axes[0].set_xlabel("Position id")
+            sns.heatmap(merged_attns, ax=axes[0])
+            axes[0].set_ylabel("Layer idx")
+            axes[0].set_xlabel("Position id")
 
-        sns.barplot(merged_attns.max(0)[0], ax=axes[1])
-        axes[1].set_ylabel("Aggregated score")
-        axes[1].set_xlabel("Position id")
+            sns.barplot(merged_attns.max(0)[0], ax=axes[1])
+            axes[1].set_ylabel("Aggregated score")
+            axes[1].set_xlabel("Position id")
 
-        plt.tight_layout()
+            plt.tight_layout()
     else:
         num_of_heads = 4 # the first 4 for now
         
