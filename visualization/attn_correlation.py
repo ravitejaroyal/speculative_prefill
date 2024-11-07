@@ -8,7 +8,7 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaForCausalLM
 
-spec_model_name = 'meta-llama/Llama-3.2-3B-Instruct'
+spec_model_name = 'meta-llama/Llama-3.2-1B-Instruct'
 base_model_name = 'meta-llama/Meta-Llama-3.1-8B-Instruct'
 tokenizer_name = 'meta-llama/Meta-Llama-3.1-8B-Instruct'
 
@@ -76,6 +76,7 @@ base_attns = get_attn_scores(base_model_name)
 
 # visualize relationship between two models
 correlation = torch.zeros((len(spec_attns), len(base_attns)))
+variance = torch.zeros((len(spec_attns), len(base_attns)))
 
 for si in range(len(spec_attns)):
     for bi in range(len(base_attns)):
@@ -87,13 +88,22 @@ for si in range(len(spec_attns)):
         sa = torch.nn.functional.log_softmax(sa, dim=-1)
         ba = torch.nn.functional.softmax(ba, dim=-1)
 
-        score = torch.nn.functional.kl_div(sa, ba, reduction='batchmean')
+        scores = torch.nn.functional.kl_div(sa, ba, reduction='none')
+        var = ((scores - scores.mean()) ** 2).mean()
 
-        correlation[si, bi] = score
+        correlation[si, bi] = scores.mean()
+        variance[si, bi] = var
 
-sns.heatmap(correlation, square=True)
-plt.xlabel("Layer idx of base model")
-plt.ylabel("Layer idx of spec model")
-plt.gca().invert_yaxis()
+_, axes = plt.subplots(2, 1, figsize=(6.4, 4.8 * 2))
+
+sns.heatmap(correlation, square=True, ax=axes[0])
+sns.heatmap(variance, square=True, ax=axes[1], cmap=sns.color_palette("light:b", as_cmap=True))
+axes[1].set_xlabel("Layer idx of base model")
+axes[0].set_ylabel("Layer idx of spec model")
+axes[1].set_ylabel("Layer idx of spec model")
+
+axes[0].invert_yaxis()
+axes[1].invert_yaxis()
+
 plt.tight_layout()
-plt.savefig('./visualization/kl_3b8b.png', dpi=300)
+plt.savefig('./visualization/kl_1b8b.png', dpi=300)
