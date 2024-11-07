@@ -194,7 +194,7 @@ class HFSpecWorker(SpecWorker):
             # take of layers if necessary
             all_layer_attns = all_layer_attns[layer_start:layer_end]
             # max over heads
-            all_layer_attns = all_layer_attns.max(1)[0]
+            all_layer_attns = all_layer_attns.max(1)[0].to(torch.float32)
             # smooth out attn
             kernel_size = self.spec_config.algo_kwargs.get("pool_kernel_size", None)
             if kernel_size:
@@ -261,7 +261,7 @@ class HFSpecWorker(SpecWorker):
             # [layer_cnt, B, prefill_len]
             attn = attn.max(dim=2)[0][..., :prefill_len].squeeze(-2).squeeze(-2)
             # normalize
-            attn = torch.nn.functional.softmax(attn, dim=-1)
+            attn = torch.nn.functional.softmax(attn, dim=-1, dtype=torch.float32)
             # smooth it out
             kernel_size = self.spec_config.algo_kwargs.get("pool_kernel_size", None)
             if kernel_size:
