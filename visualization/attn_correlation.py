@@ -109,8 +109,8 @@ _, axes = plt.subplots(
     3, 1, 
     figsize=(6.4, 4.8 * 3))
 
-sns.heatmap(kls, square=True, ax=axes[0])
-sns.heatmap(taus, square=True, ax=axes[1], cmap=sns.color_palette("light:b", as_cmap=True))
+sns.heatmap(kls, ax=axes[0])
+sns.heatmap(taus, ax=axes[1], cmap=sns.color_palette("light:b", as_cmap=True))
 axes[1].set_xlabel("Layer idx of base model")
 axes[0].set_ylabel("Layer idx of spec model")
 axes[1].set_ylabel("Layer idx of spec model")
