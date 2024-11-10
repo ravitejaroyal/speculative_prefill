@@ -1,1 +1,2 @@
-from speculative_prefill.vllm_patch_hf import enable_prefill_spec
+# from speculative_prefill.vllm_patch_hf import enable_prefill_spec
+from speculative_prefill.vllm_patch import enable_prefill_spec

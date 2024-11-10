@@ -16,7 +16,7 @@ class PatchedGPUExecutor(GPUExecutor):
         """
         worker_class_fn = None
         if os.environ.get("SPEC_MODEL", None):
-            worker_module_name = "speculative_prefill.vllm_patch_hf.worker.spec_prefill_worker"
+            worker_module_name = "speculative_prefill.vllm_patch.worker.spec_prefill_worker"
             worker_class_name = "create_spec_worker"
         elif self.scheduler_config.is_multi_step:
             worker_module_name = "vllm.worker.multi_step_worker"
