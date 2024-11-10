@@ -16,7 +16,7 @@ from transformers.models.llama.modeling_llama import (LlamaAttention,
                                                       repeat_kv)
 from transformers.utils import logging
 
-from speculative_prefill.vllm_patch.config import SpecConfig
+from speculative_prefill.vllm_patch_hf.config import SpecConfig
 
 logger = logging.get_logger(__name__)
 

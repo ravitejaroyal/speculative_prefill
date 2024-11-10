@@ -1,4 +1,4 @@
-from speculative_prefill.vllm_patch.executor.gpu_executor import (
+from speculative_prefill.vllm_patch_hf.executor.gpu_executor import (
     PatchedGPUExecutor, PatchedGPUExecutorAsync)
 
 

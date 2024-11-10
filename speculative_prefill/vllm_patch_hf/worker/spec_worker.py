@@ -11,9 +11,10 @@ from transformers.modeling_outputs import (BaseModelOutputWithPast,
 from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.sequence import ExecuteModelRequest
 
-from speculative_prefill.vllm_patch.config import SpecConfig
-from speculative_prefill.vllm_patch.data.sequence import AugmentedSequenceData
-from speculative_prefill.vllm_patch.models.llama import (
+from speculative_prefill.vllm_patch_hf.config import SpecConfig
+from speculative_prefill.vllm_patch_hf.data.sequence import \
+    AugmentedSequenceData
+from speculative_prefill.vllm_patch_hf.models.llama import (
     enable_fa2_output_attns, visualize_attns)
 
 

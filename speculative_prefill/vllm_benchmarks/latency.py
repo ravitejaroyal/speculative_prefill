@@ -151,7 +151,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.spec_prefill:
-        from speculative_prefill.vllm_patch import enable_prefill_spec
+        from speculative_prefill.vllm_patch_hf import enable_prefill_spec
         enable_prefill_spec(
             spec_model='meta-llama/Llama-3.2-1B-Instruct', 
             spec_config_path='./local/config.yaml'
