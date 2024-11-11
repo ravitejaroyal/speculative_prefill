@@ -9,6 +9,7 @@ from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
 from vllm.worker.worker_base import LoraNotSupportedWorkerBase
 
+from speculative_prefill.vllm_patch.config import get_spec_config
 from speculative_prefill.vllm_patch.worker.look_ahead_spec_worker import \
     LookAheadSpecWorker
 
@@ -80,6 +81,7 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
     ):
         self.base_model_worker = base_model_worker
         self.spec_model_worker = spec_model_worker
+        self.spec_config = get_spec_config()
     
     def init_device(self) -> None:
         # The base worker model is initialized first in case the spec
@@ -128,7 +130,10 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
     ) -> List[SamplerOutput] | None:
         
         if execute_model_req is not None:
-            self.spec_model_worker.speculate(execute_model_req)
+            self.spec_model_worker.speculate(
+                execute_model_req, 
+                look_ahead_cnt=self.spec_config.look_ahead_cnt
+            )
 
         return self.base_model_worker.execute_model(execute_model_req)
 

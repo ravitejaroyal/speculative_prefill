@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, fields
 from typing import Any, Dict, Optional
 
@@ -8,6 +9,7 @@ import yaml
 class SpecConfig:
     keep_strategy: Optional[str]
     keep_kwargs: Optional[Dict[str, Any]] = None
+    look_ahead_cnt: int = 8
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):
@@ -40,3 +42,18 @@ class SpecConfig:
 
         if self.keep_kwargs is None:
             self.keep_kwargs = {}
+
+
+_SPEC_CONFIG: Optional[SpecConfig] = None
+
+def init_spec_config():
+    global _SPEC_CONFIG
+    if _SPEC_CONFIG is None:
+        _SPEC_CONFIG = SpecConfig.from_path(
+            os.environ.get("SPEC_CONFIG_PATH")
+        )
+
+def get_spec_config() -> SpecConfig:
+    global _SPEC_CONFIG
+    assert _SPEC_CONFIG is not None
+    return _SPEC_CONFIG
