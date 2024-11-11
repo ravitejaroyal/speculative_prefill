@@ -1,14 +1,85 @@
+import math
 from copy import deepcopy
+from functools import partial
+from types import MethodType
 from typing import List, Optional, Tuple
 
 import torch
+from vllm.attention import AttentionMetadata
 from vllm.attention.backends.flash_attn import FlashAttentionMetadata
 from vllm.model_executor.layers.sampler import SamplerOutput
+from vllm.model_executor.models.llama import (LlamaAttention,
+                                              LlamaDecoderLayer,
+                                              LlamaForCausalLM)
 from vllm.sequence import ExecuteModelRequest, SequenceGroupMetadata
 from vllm.worker.worker import Worker
 
 
+def _forward_with_query_dump(
+    self: LlamaAttention,
+    positions: torch.Tensor,
+    hidden_states: torch.Tensor,
+    kv_cache: torch.Tensor,
+    attn_metadata: AttentionMetadata, 
+    query_buffer: List[List[torch.Tensor]], 
+    layer_idx: int
+) -> torch.Tensor:
+    qkv, _ = self.qkv_proj(hidden_states)
+    q, k, v = qkv.split([self.q_size, self.kv_size, self.kv_size], dim=-1)
+    q, k = self.rotary_emb(positions, q, k)
+
+    if attn_metadata.num_prefills > 0:
+        query_buffer[layer_idx].append(
+            q[attn_metadata.seq_lens_tensor - 1, :])
+    else:
+        query_buffer[layer_idx].append(q)
+
+    attn_output = self.attn(q, k, v, kv_cache, attn_metadata)
+    output, _ = self.o_proj(attn_output)
+    return output
+
+
 class LookAheadSpecWorker(Worker):
+    def load_model(self):
+        super().load_model()
+        assert isinstance(self.model_runner.model, LlamaForCausalLM)
+        
+        self._prepare_query_buffer()
+
+        # do patching here to allow model output attention
+        for layer_idx, layer in enumerate(self.model_runner.model.model.layers):
+            assert isinstance(layer, LlamaDecoderLayer)
+            layer.self_attn.forward = MethodType(
+                partial(
+                    _forward_with_query_dump, 
+                    query_buffer=self.query_buffer, 
+                    layer_idx=layer_idx), 
+                layer.self_attn)
+            
+        self._reshape_key = partial(
+            torch.repeat_interleave, 
+            dim=1, 
+            repeats=(
+                self.model_runner.model.config.num_attention_heads //
+                self.model_runner.model.config.num_key_value_heads
+            ))
+        
+        self._reshape_query = lambda x: x.reshape(
+            -1, 
+            self.model_runner.model.config.num_attention_heads, 
+            self.model_runner.model.config.head_dim
+        )
+
+    def _prepare_query_buffer(self):
+        if not hasattr(self, "query_buffer"):
+            self.query_buffer = [
+                [] for _ in range(self._get_model_num_layers())
+            ]
+        else:
+            # using clear instead of resetting prevents losing ref
+            for qb in self.query_buffer:
+                qb.clear()
+
     @torch.inference_mode
     def speculate(
         self, 
@@ -16,6 +87,8 @@ class LookAheadSpecWorker(Worker):
         look_ahead_cnt: int = 1
     ) -> ExecuteModelRequest:
         
+        assert look_ahead_cnt > 0
+
         self._raise_if_unsupported(execute_model_req)
 
         request, non_empty = self._extract_prompt_execute_model_req(
@@ -26,17 +99,13 @@ class LookAheadSpecWorker(Worker):
         if not non_empty:
             return execute_model_req
 
-        prefill_slot_mapping = None
-        decode_slot_mapping = None
+        self._prepare_query_buffer()
 
         model_outputs: List[SamplerOutput] = []
 
         for itr in range(look_ahead_cnt):
-            prefill_slot_mapping, decode_slot_mapping = self._update_slot_mapping(
-                request, 
-                prefill_slot_mapping=prefill_slot_mapping, 
-                decode_slot_mapping=decode_slot_mapping
-            )
+            if itr == 0:
+                prefill_slot_mapping = self._get_prefill_slot_mapping(request)
 
             model_output: List[SamplerOutput] = super().execute_model(
                 execute_model_req=request)
@@ -53,7 +122,7 @@ class LookAheadSpecWorker(Worker):
 
         self._get_attention_scores(
             prefill_slot_mapping=prefill_slot_mapping, 
-            decode_slot_mapping=decode_slot_mapping
+            kv_cache=self.kv_cache[execute_model_req.virtual_engine]
         )
         
         exit()
@@ -66,30 +135,90 @@ class LookAheadSpecWorker(Worker):
         # num_hidden_layers = getattr(
         #     self.model_runner.model_config.hf_text_config, "num_hidden_layers")
         
+    def _get_model_num_layers(self) -> int:
+        return getattr(
+            self.model_runner.model_config.hf_text_config, "num_hidden_layers")
 
     def _get_attention_scores(
         self, 
         prefill_slot_mapping: Optional[List[torch.Tensor]], 
-        decode_slot_mapping: Optional[List[torch.Tensor]]
-    ):
-        pass
-
-    def _get_tensors_from_slot_mapping(
-        slot_mapping: torch.Tensor, 
-        cache_pos: int
-    ):
+        kv_cache: List[torch.Tensor]
+    ) -> List[torch.Tensor]:
         """
-            cache_pos = 0 means keys
-            cache_pos = 1 means values
+            A caveat or potentially a good design here:
+                For look ahead tokens, we also just attend to context, 
+                not generated tokens
         """
-        assert cache_pos in [0, 1]
-        pass
 
-    def _update_slot_mapping(
+        attn_weights = []
+
+        # first lets get the queries out from query_buffer
+        for layer_idx in range(len(self.query_buffer)):
+            attn_weights.append([])
+
+            # get keys from kv cache (one tensor per sample)
+            keys = self._get_keys_from_slot_mapping(
+                slot_mapping=prefill_slot_mapping, 
+                layer_idx=layer_idx, 
+                kv_cache=kv_cache)
+            
+            # get queries from dump buffer [look_ahead_cnt, sample_cnt, tensors]
+            queries = self.query_buffer[layer_idx]
+            queries = torch.split(
+                torch.stack(queries, dim=0), 
+                split_size_or_sections=1, 
+                dim=1)
+            
+            for q, k in zip(queries, keys):
+                # (len, num_heads, head_dim)
+                query = self._reshape_query(q).transpose(0, 1)
+                key = self._reshape_key(k).transpose(0, 1)
+                
+                attn = torch.matmul(
+                    query, key.transpose(-1, -2)
+                ) / math.sqrt(query.shape[-1])
+
+                attn = torch.nn.functional.softmax(
+                    attn, 
+                    dim=-1, 
+                    dtype=torch.float32
+                ).to(key.dtype)
+
+                attn_weights[-1].append(attn)
+
+        # reshape -> from [layer, sample, attn] to [sample, layer, attn]
+        reshaped_attn_weights: List[torch.Tensor] = []
+        for sample_idx in range(len(attn_weights[0])):
+            reshaped_attn_weights.append(
+                torch.stack(
+                    [attn_weights[layer_idx][sample_idx] for layer_idx in range(len(attn_weights))], 
+                    dim=0))
+
+        return reshaped_attn_weights
+
+    def _get_keys_from_slot_mapping(
+        self, 
+        slot_mapping: List[torch.Tensor], 
+        layer_idx: int, 
+        kv_cache: List[torch.Tensor]
+    ) -> List[torch.Tensor]:
+        # (num_blocks, block_size, num_kv_heads, head_size)
+        key_cache = kv_cache[layer_idx][0]
+        block_size = key_cache.shape[1]
+
+        keys = []
+        
+        for sm in slot_mapping:
+            block_indices = sm // block_size
+            block_pos = sm % block_size
+
+            keys.append(key_cache[block_indices, block_pos, :, :])
+            
+        return keys
+
+    def _get_prefill_slot_mapping(
         self, 
         execute_model_req: ExecuteModelRequest, 
-        prefill_slot_mapping: Optional[List[torch.Tensor]], 
-        decode_slot_mapping: Optional[List[torch.Tensor]]
     ) -> Tuple[Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
         model_input, _,  _ = self.prepare_input(
             execute_model_req
@@ -98,29 +227,11 @@ class LookAheadSpecWorker(Worker):
         self.model_runner.attn_state.begin_forward(model_input)
         assert model_input.attn_metadata is not None
         prefill_metadata: FlashAttentionMetadata = model_input.attn_metadata.prefill_metadata
-        decode_metadata: FlashAttentionMetadata = model_input.attn_metadata.decode_metadata
+        assert prefill_metadata is not None
 
-        # exclusive check
-        assert bool(prefill_metadata is not None) != bool(decode_metadata is not None)
-
-        if prefill_metadata is not None:
-            return list(torch.split(
-                prefill_metadata.slot_mapping, 
-                prefill_metadata.seq_lens_tensor.tolist())), decode_slot_mapping
-        else:
-            assert decode_metadata.decode_metadata == 1
-            assert decode_metadata.num_decode_tokens == len(decode_metadata.slot_mapping)
-
-            if decode_slot_mapping == None:
-                decode_slot_mapping = list(torch.split(decode_metadata.slot_mapping, 1))
-            else:
-                for sample_idx in range(len(decode_slot_mapping)):
-                    decode_slot_mapping[sample_idx] = torch.concat([
-                            decode_slot_mapping[sample_idx], 
-                            decode_metadata.slot_mapping[sample_idx: sample_idx + 1]
-                        ], dim=0)
-
-            return prefill_slot_mapping, decode_slot_mapping
+        return list(torch.split(
+            prefill_metadata.slot_mapping, 
+            prefill_metadata.seq_lens_tensor.tolist()))
 
     def _extract_prompt_execute_model_req(
         self, 
@@ -189,5 +300,3 @@ class LookAheadSpecWorker(Worker):
                 execute_model_req.seq_group_metadata_list):
             raise NotImplementedError(
                 "MultiStepWorker does not support beam search.")
-
-    
