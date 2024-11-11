@@ -7,7 +7,10 @@ from vllm.model_executor.layers.sampler import SamplerOutput
 from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker import Worker
-from vllm.worker.worker_base import LoraNotSupportedWorkerBase, WorkerBase
+from vllm.worker.worker_base import LoraNotSupportedWorkerBase
+
+from speculative_prefill.vllm_patch.worker.look_ahead_spec_worker import \
+    LookAheadSpecWorker
 
 
 def split_num_cache_blocks_evenly(
@@ -61,7 +64,7 @@ def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
         use_async_output_proc=model_config.use_async_output_proc,
         override_neuron_config=model_config.override_neuron_config
     )
-    spec_model_worker = Worker(*args, **spec_kwargs)
+    spec_model_worker = LookAheadSpecWorker(*args, **spec_kwargs)
 
     return SpecPrefillWorker(
         base_model_worker=base_model_worker, 
@@ -72,8 +75,8 @@ def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
 class SpecPrefillWorker(LoraNotSupportedWorkerBase):
     def __init__(
         self,
-        base_model_worker: WorkerBase, 
-        spec_model_worker: WorkerBase, 
+        base_model_worker: Worker, 
+        spec_model_worker: LookAheadSpecWorker, 
     ):
         self.base_model_worker = base_model_worker
         self.spec_model_worker = spec_model_worker
@@ -123,14 +126,11 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self, 
         execute_model_req: ExecuteModelRequest | None = None
     ) -> List[SamplerOutput] | None:
-        return self.base_model_worker.execute_model(execute_model_req)
+        
+        if execute_model_req is not None:
+            self.spec_model_worker.speculate(execute_model_req)
 
-    @torch.inference_mode()
-    def start_worker_execution_loop(self) -> None:
-        """Execute model loop to perform speculative decoding
-        in parallel worker."""
-        while self._run_non_driver_rank():
-            pass
+        return self.base_model_worker.execute_model(execute_model_req)
 
     def get_cache_block_size_bytes(self) -> int:
         raise NotImplementedError
