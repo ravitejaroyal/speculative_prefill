@@ -5,7 +5,9 @@ from typing import Optional
 import torch
 import torch.distributed
 
+from speculative_prefill.vllm_patch.config import init_spec_config
 from speculative_prefill.vllm_patch.executor import patch_executor
+from speculative_prefill.vllm_patch.scheduler import patch_scheduler
 
 _TITLE = """
 |=========================================================================================|
@@ -47,7 +49,10 @@ def enable_prefill_spec(
     if spec_config_path is not None:
         os.environ.setdefault("SPEC_CONFIG_PATH", spec_config_path)
 
+    init_spec_config()
+
     print("Applying speculative prefill vllm monkey patch...")
     patch_executor()
+    patch_scheduler()
 
     atexit.register(clean_up_fn)
