@@ -1,5 +1,6 @@
+import json
 import os
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from typing import Any, Dict, Optional
 
 import yaml
@@ -10,6 +11,7 @@ class SpecConfig:
     keep_strategy: Optional[str]
     keep_kwargs: Optional[Dict[str, Any]] = None
     look_ahead_cnt: int = 8
+    pool_kernel_size: Optional[int] = None
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):
@@ -53,7 +55,7 @@ def init_spec_config():
             os.environ.get("SPEC_CONFIG_PATH")
         )
         print("\033[92m{}\033[00m".format(
-            f"Using spec config:\n{_SPEC_CONFIG}"))
+            f"Using spec config:\n{json.dumps(asdict(_SPEC_CONFIG), indent=4)}"))
 
 def get_spec_config() -> SpecConfig:
     global _SPEC_CONFIG

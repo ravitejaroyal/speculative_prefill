@@ -255,9 +255,20 @@ class LookAheadSpecWorker(Worker):
                 dtype=torch.float32
             ).to(original_dtype)
 
-            # max over heads
-            attn = attn.max(0)[0]
-            # max over layers
+            # aggregate layer and heads
+            attn = attn.flatten(0, 1)
+
+            # smooth if we need to
+            kernel_size = self.spec_config.pool_kernel_size
+            if kernel_size:
+                attn = torch.nn.functional.avg_pool1d(
+                    attn, 
+                    kernel_size=kernel_size, 
+                    padding=kernel_size // 2,
+                    stride=1
+                )
+
+            # max over heads and layers
             attn = attn.max(0)[0]
             # average over look ahead cnt
             attn = attn.mean(0)
