@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple
 
 import torch
 from vllm.config import ModelConfig
+from vllm.distributed.communication_op import broadcast_tensor_dict
 from vllm.model_executor.layers.sampler import SamplerOutput
 from vllm.sequence import ExecuteModelRequest
 from vllm.worker.model_runner import ModelRunner
@@ -136,12 +137,46 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
         self, 
         execute_model_req: ExecuteModelRequest | None = None
     ) -> List[SamplerOutput] | None:
+        if self.rank != self._driver_rank:
+            self._run_non_driver_rank()
+            return []
         
-        if execute_model_req is not None:
+        if execute_model_req is None:
+            # we finished all things
+            broadcast_tensor_dict({}, src=self._driver_rank)
+            return []
+
+        has_prefill = any([sgm.is_prompt for sgm in execute_model_req.seq_group_metadata_list])
+
+        broadcast_tensor_dict({
+            "has_prefill": has_prefill
+        }, src=self._driver_rank)
+
+        if has_prefill:
             execute_model_req = self.spec_model_worker.speculate(execute_model_req)
             execute_model_req = self._record_and_update_requests(execute_model_req)
 
         return self.base_model_worker.execute_model(execute_model_req)
+
+    @torch.inference_mode()
+    def start_worker_execution_loop(self) -> None:
+        while self._run_non_driver_rank():
+            pass
+
+    def _run_non_driver_rank(self) -> bool:
+        assert self.rank != self._driver_rank
+
+        data = broadcast_tensor_dict(src=self._driver_rank)
+        if not data:
+            # finished everything
+            return False
+
+        if data['has_prefill']:
+            self.spec_model_worker.speculate()
+
+        self.base_model_worker.execute_model()
+
+        return True
 
     def _record_and_update_requests(
         self, 
@@ -166,3 +201,15 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
 
     def get_cache_block_size_bytes(self) -> int:
         raise NotImplementedError
+
+    @property
+    def rank(self):
+        return self.base_model_worker.rank
+
+    @property
+    def device(self):
+        return self.base_model_worker.device
+
+    @property
+    def _driver_rank(self) -> int:
+        return 0

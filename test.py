@@ -19,6 +19,7 @@ llm = LLM(
     gpu_memory_utilization=0.8, 
     enforce_eager=True, 
     enable_chunked_prefill=False, 
+    tensor_parallel_size=1
 )
 
 # input_text = """
