@@ -120,21 +120,46 @@ class LookAheadSpecWorker(Worker):
             )
             model_outputs.append(model_output)
 
-        self._get_attention_scores(
+        # sample list of [num_layer, num_head, look_ahead_cnt, context_len]
+        attn_scores = self._get_attention_scores(
             prefill_slot_mapping=prefill_slot_mapping, 
             kv_cache=self.kv_cache[execute_model_req.virtual_engine]
         )
         
-        exit()
+        # a list of 1D tensor with size prefill len
+        importance_score = self._token_importance_from_attn_scores(
+            attn_scores=attn_scores
+        )
 
-        # # get the attention score somehow
-        # assert self.kv_cache is not None
-        # # layer_cnt, (2, num_blocks, block_size, num_kv_heads, head_size)
-        # kv_caches = self.kv_cache[execute_model_req.virtual_engine]
+        exit()
         
-        # num_hidden_layers = getattr(
-        #     self.model_runner.model_config.hf_text_config, "num_hidden_layers")
-        
+    def _token_importance_from_attn_scores(
+        self, 
+        attn_scores: List[torch.Tensor]
+    ) -> List[torch.Tensor]:
+        token_importance: List[torch.Tensor] = []
+
+        for attn in attn_scores:
+            # [num_layer, num_head, look_ahead_cnt, context_len]
+            
+            # max over heads
+            attn = attn.max(0)[0]
+            # max over layers
+            attn = attn.max(0)[0]
+            # softmax
+            original_dtype = attn.dtype
+            attn = torch.nn.functional.softmax(
+                attn, 
+                dim=-1, 
+                dtype=torch.float32
+            ).to(original_dtype)
+            # average over look ahead cnt
+            attn = attn.mean(0)
+
+            token_importance.append(attn)
+
+        return token_importance
+
     def _get_model_num_layers(self) -> int:
         return getattr(
             self.model_runner.model_config.hf_text_config, "num_hidden_layers")
@@ -177,12 +202,6 @@ class LookAheadSpecWorker(Worker):
                 attn = torch.matmul(
                     query, key.transpose(-1, -2)
                 ) / math.sqrt(query.shape[-1])
-
-                attn = torch.nn.functional.softmax(
-                    attn, 
-                    dim=-1, 
-                    dtype=torch.float32
-                ).to(key.dtype)
 
                 attn_weights[-1].append(attn)
 
