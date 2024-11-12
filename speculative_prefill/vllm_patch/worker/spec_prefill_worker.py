@@ -154,7 +154,8 @@ class SpecPrefillWorker(LoraNotSupportedWorkerBase):
 
         if has_prefill:
             execute_model_req = self.spec_model_worker.speculate(execute_model_req)
-            execute_model_req = self._record_and_update_requests(execute_model_req)
+        
+        execute_model_req = self._record_and_update_requests(execute_model_req)
 
         return self.base_model_worker.execute_model(execute_model_req)
 
