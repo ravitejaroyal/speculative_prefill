@@ -6,6 +6,7 @@ import torch
 import torch.distributed
 
 from speculative_prefill.vllm_patch.config import init_spec_config
+from speculative_prefill.vllm_patch.data import patch_data
 from speculative_prefill.vllm_patch.executor import patch_executor
 from speculative_prefill.vllm_patch.scheduler import patch_scheduler
 
@@ -54,5 +55,6 @@ def enable_prefill_spec(
     print("Applying speculative prefill vllm monkey patch...")
     patch_executor()
     patch_scheduler()
+    patch_data()
 
     atexit.register(clean_up_fn)

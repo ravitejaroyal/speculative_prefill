@@ -14,6 +14,9 @@ from vllm.model_executor.models.llama import (LlamaAttention,
 from vllm.sequence import ExecuteModelRequest, SequenceGroupMetadata
 from vllm.worker.worker import Worker
 
+from speculative_prefill.vllm_patch.config import get_spec_config
+from speculative_prefill.vllm_patch.data.sequence import AugmentedSequenceData
+
 
 def _forward_with_query_dump(
     self: LlamaAttention,
@@ -44,6 +47,8 @@ class LookAheadSpecWorker(Worker):
         super().load_model()
         assert isinstance(self.model_runner.model, LlamaForCausalLM)
         
+        self.spec_config = get_spec_config()
+
         self._prepare_query_buffer()
 
         # do patching here to allow model output attention
@@ -83,10 +88,10 @@ class LookAheadSpecWorker(Worker):
     @torch.inference_mode
     def speculate(
         self, 
-        execute_model_req: ExecuteModelRequest, 
-        look_ahead_cnt: int = 1
+        execute_model_req: ExecuteModelRequest
     ) -> ExecuteModelRequest:
         
+        look_ahead_cnt = self.spec_config.look_ahead_cnt
         assert look_ahead_cnt > 0
 
         self._raise_if_unsupported(execute_model_req)
@@ -127,12 +132,84 @@ class LookAheadSpecWorker(Worker):
         )
         
         # a list of 1D tensor with size prefill len
-        importance_score = self._token_importance_from_attn_scores(
+        token_importance = self._token_importance_from_attn_scores(
             attn_scores=attn_scores
         )
 
-        exit()
+        # get token indices that decide on what to keep
+        kept_indices = self._get_kept_indices_from_token_importance(
+            token_importance=token_importance
+        )
+
+        return self._reassemble_execute_model_req(
+            execute_model_req=execute_model_req, 
+            kept_indices=kept_indices
+        )
+
+    def _reassemble_execute_model_req(
+        self, 
+        execute_model_req: ExecuteModelRequest, 
+        kept_indices: List[torch.LongTensor]
+    ) -> ExecuteModelRequest:
+        # now we need to update the original request
+        index_pos = 0
+        new_seq_group_metadata_list = []
+        for metadata in execute_model_req.seq_group_metadata_list:
+            if metadata.is_prompt:
+                cur_indices = kept_indices[index_pos].cpu()
+                index_pos += 1
+
+                # get the seq data
+                assert len(metadata.seq_data) == 1
+                seq_id = metadata.get_first_seq_id()
+                seq_data = metadata.seq_data[seq_id]
+                
+                prompt_token_ids = seq_data._prompt_token_ids
+                output_token_ids = seq_data._output_token_ids
+                
+                new_seq_data = AugmentedSequenceData.from_seqs_and_pos_ids(
+                    prompt_token_ids=torch.LongTensor(prompt_token_ids)[cur_indices], 
+                    position_ids=cur_indices.tolist(), 
+                    output_token_ids=output_token_ids
+                )
+
+                metadata.seq_data[seq_id] = new_seq_data
+
+            new_seq_group_metadata_list.append(metadata)
+
+        assert index_pos == len(kept_indices)
+        return execute_model_req.clone(
+            seq_group_metadata_list=new_seq_group_metadata_list)
+    
+    def _get_kept_indices_from_token_importance(
+        self, 
+        token_importance: List[torch.Tensor]
+    ) -> List[torch.LongTensor]:
         
+        kept_indices = []
+        for sample_ti in token_importance: 
+            seq_len = len(sample_ti)
+            
+            percentage = self.spec_config.keep_kwargs.get("percentage", 1.0)
+
+            if self.spec_config.keep_kwargs.get("chunk", False):
+                chunk_size = self.spec_config.keep_kwargs.get("chunk_size", 32)
+                chunk_ti = torch.split(sample_ti, chunk_size, dim=-1)
+                chunk_ti = [cti.mean() for cti in chunk_ti]
+                chunk_cnt = len(chunk_ti)
+                
+                keep_chunk_cnt = math.ceil(chunk_cnt * percentage)
+                _, chunk_indices = torch.topk(torch.stack(chunk_ti), k=keep_chunk_cnt, dim=-1)
+                indices = torch.split(torch.arange(seq_len), chunk_size, dim=-1)
+                indices = torch.concat([indices[ci.item()] for ci in chunk_indices])
+            else:
+                topk = math.ceil(seq_len * percentage)
+                _, indices = torch.topk(sample_ti, k=topk, dim=-1)
+
+            kept_indices.append(torch.sort(indices)[0])
+
+        return kept_indices
+
     def _token_importance_from_attn_scores(
         self, 
         attn_scores: List[torch.Tensor]
