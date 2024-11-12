@@ -125,10 +125,17 @@ class LookAheadSpecWorker(Worker):
             )
             model_outputs.append(model_output)
 
+        # assume the same eos ids across requests
+        actual_look_ahead_cnts = self._get_actual_look_ahead_cnts(
+            model_outputs, 
+            [128001, 128008, 128009] # hard coded for now
+        )
+
         # sample list of [num_layer, num_head, look_ahead_cnt, context_len]
         attn_scores = self._get_attention_scores(
             prefill_slot_mapping=prefill_slot_mapping, 
-            kv_cache=self.kv_cache[execute_model_req.virtual_engine]
+            kv_cache=self.kv_cache[execute_model_req.virtual_engine], 
+            actual_look_ahead_cnts=actual_look_ahead_cnts
         )
         
         # a list of 1D tensor with size prefill len
@@ -145,6 +152,27 @@ class LookAheadSpecWorker(Worker):
             execute_model_req=execute_model_req, 
             kept_indices=kept_indices
         )
+
+    def _get_actual_look_ahead_cnts(
+        self, 
+        model_outputs: List[SamplerOutput], 
+        stop_token_ids: List[int]
+    ) -> List[int]:
+        actual_look_ahead_cnts = [
+            self.spec_config.look_ahead_cnt
+        ] * len(model_outputs[0].outputs)
+
+        for step, mo in enumerate(model_outputs):
+            outputs = mo.outputs
+            for idx, stop in enumerate([output.samples[0].output_token in stop_token_ids \
+                for output in outputs]):
+                if stop:
+                    actual_look_ahead_cnts[idx] = min(
+                        actual_look_ahead_cnts[idx], 
+                        step
+                    )
+
+        return actual_look_ahead_cnts
 
     def _reassemble_execute_model_req(
         self, 
@@ -245,7 +273,8 @@ class LookAheadSpecWorker(Worker):
     def _get_attention_scores(
         self, 
         prefill_slot_mapping: Optional[List[torch.Tensor]], 
-        kv_cache: List[torch.Tensor]
+        kv_cache: List[torch.Tensor], 
+        actual_look_ahead_cnts: List[int]
     ) -> List[torch.Tensor]:
         """
             A caveat or potentially a good design here:
@@ -272,11 +301,14 @@ class LookAheadSpecWorker(Worker):
                 split_size_or_sections=1, 
                 dim=1)
             
-            for q, k in zip(queries, keys):
+            for q, k, c in zip(queries, keys, actual_look_ahead_cnts):
                 # (len, num_heads, head_dim)
                 query = self._reshape_query(q).transpose(0, 1)
                 key = self._reshape_key(k).transpose(0, 1)
                 
+                # take off things if we hit EOS
+                query = query[:, :c, :]
+
                 attn = torch.matmul(
                     query, key.transpose(-1, -2)
                 ) / math.sqrt(query.shape[-1])
