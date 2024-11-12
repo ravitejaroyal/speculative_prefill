@@ -52,6 +52,8 @@ def init_spec_config():
         _SPEC_CONFIG = SpecConfig.from_path(
             os.environ.get("SPEC_CONFIG_PATH")
         )
+        print("\033[92m{}\033[00m".format(
+            f"Using spec config:\n{_SPEC_CONFIG}"))
 
 def get_spec_config() -> SpecConfig:
     global _SPEC_CONFIG

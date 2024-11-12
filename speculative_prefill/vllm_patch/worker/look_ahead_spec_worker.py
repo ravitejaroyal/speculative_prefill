@@ -219,10 +219,6 @@ class LookAheadSpecWorker(Worker):
         for attn in attn_scores:
             # [num_layer, num_head, look_ahead_cnt, context_len]
             
-            # max over heads
-            attn = attn.max(0)[0]
-            # max over layers
-            attn = attn.max(0)[0]
             # softmax
             original_dtype = attn.dtype
             attn = torch.nn.functional.softmax(
@@ -230,6 +226,11 @@ class LookAheadSpecWorker(Worker):
                 dim=-1, 
                 dtype=torch.float32
             ).to(original_dtype)
+
+            # max over heads
+            attn = attn.max(0)[0]
+            # max over layers
+            attn = attn.max(0)[0]
             # average over look ahead cnt
             attn = attn.mean(0)
 
