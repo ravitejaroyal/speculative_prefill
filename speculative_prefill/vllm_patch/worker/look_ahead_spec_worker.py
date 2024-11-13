@@ -257,7 +257,7 @@ class LookAheadSpecWorker(Worker):
                 if stop:
                     actual_look_ahead_cnts[idx] = min(
                         actual_look_ahead_cnts[idx], 
-                        step
+                        step + 1
                     )
 
         return actual_look_ahead_cnts
