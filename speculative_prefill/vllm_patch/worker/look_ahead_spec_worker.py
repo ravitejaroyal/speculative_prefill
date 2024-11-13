@@ -191,8 +191,10 @@ class LookAheadSpecWorker(Worker):
         self, 
         slot_mapping: Optional[List[torch.Tensor]], 
         kv_cache: List[torch.Tensor] 
-    ) -> torch.Tensor | None:
+    ) -> List[List[torch.Tensor]] | None:
         all_keys = []
+
+        key_lens = None
 
         for layer_idx in range(self._get_model_num_layers()):
             # (num_blocks, block_size, num_kv_heads, head_size)
@@ -206,12 +208,38 @@ class LookAheadSpecWorker(Worker):
                 block_pos = sm % block_size
                 key = key_cache[block_indices, block_pos, :, :]
                 layer_keys.append(key)
-            
-            all_keys.append(torch.stack(layer_keys, dim=0))
+
+            if key_lens is None:
+                key_lens = [
+                    len(k) for k in layer_keys
+                ]
+
+            all_keys.append(torch.concat(layer_keys, dim=0))
         
         all_keys = torch.stack(all_keys, dim=0)
         
-        return tensor_model_parallel_gather(all_keys, dst=0, dim=-2)
+        all_keys = tensor_model_parallel_gather(all_keys, dst=0, dim=-2)
+
+        if all_keys is not None:
+            # split
+            assert len(key_lens) > 0
+            # first turn them into layer list
+            all_keys = torch.split(
+                all_keys, 
+                split_size_or_sections=1, 
+                dim=0
+            )
+
+            # split along sample dim
+            all_keys = [
+                torch.split(
+                    lk.squeeze(0), 
+                    split_size_or_sections=key_lens, 
+                    dim=0
+                ) for lk in all_keys
+            ]
+        
+        return all_keys
 
     def _get_actual_look_ahead_cnts(
         self, 
@@ -344,7 +372,8 @@ class LookAheadSpecWorker(Worker):
     def _get_attention_scores(
         self, 
         query_buffer: torch.Tensor, 
-        key_buffer: torch.Tensor, 
+        # because each sample might have diff number of keys
+        key_buffer: List[List[torch.Tensor]], 
         actual_look_ahead_cnts: List[int], 
     ) -> List[torch.Tensor]:
         """
