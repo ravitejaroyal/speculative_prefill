@@ -100,7 +100,7 @@ def main(args: argparse.Namespace):
             json.dump(results, f, indent=4)
 
 """
-python -m vllm_benchmarks.latency \
+python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
     --max_model_len 16384 \
     --gpu_memory_utilization 0.8 \
@@ -115,6 +115,7 @@ if __name__ == '__main__':
         description='Benchmark the latency of processing a single batch of '
         'requests till completion.')
     parser.add_argument('--spec-prefill', action='store_true', default=False)
+    parser.add_argument('--spec-model', type=str, default='meta-llama/Llama-3.2-1B-Instruct')
     parser.add_argument('--input-len', type=int, default=32)
     parser.add_argument('--output-len', type=int, default=128)
     parser.add_argument('--batch-size', type=int, default=8)
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     if args.spec_prefill:
         from speculative_prefill.vllm_patch import enable_prefill_spec
         enable_prefill_spec(
-            spec_model='meta-llama/Llama-3.2-1B-Instruct', 
+            spec_model=args.spec_model, 
             spec_config_path='./local/config.yaml'
         )
 
