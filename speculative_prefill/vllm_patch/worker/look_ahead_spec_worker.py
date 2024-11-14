@@ -250,6 +250,9 @@ class LookAheadSpecWorker(Worker):
             self.spec_config.look_ahead_cnt
         ] * len(model_outputs[0].outputs)
 
+        if self.spec_config.ignore_eos:
+            return actual_look_ahead_cnts
+
         for step, mo in enumerate(model_outputs):
             outputs = mo.outputs
             for idx, stop in enumerate([output.samples[0].output_token in stop_token_ids \

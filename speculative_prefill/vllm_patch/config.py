@@ -12,6 +12,7 @@ class SpecConfig:
     keep_kwargs: Optional[Dict[str, Any]] = None
     look_ahead_cnt: int = 8
     pool_kernel_size: Optional[int] = None
+    ignore_eos: bool = False # for benchmarking only ideally
 
     @classmethod
     def from_path(cls, config_path: Optional[str] = None):
