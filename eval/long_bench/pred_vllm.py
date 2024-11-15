@@ -17,6 +17,7 @@ def parse_args(args=None):
         "meta-llama/Meta-Llama-3.1-8B-Instruct", 
         "meta-llama/Meta-Llama-3.1-70B-Instruct", 
     ])
+    parser.add_argument('--spec-model', type=str, default='meta-llama/Llama-3.2-1B-Instruct', help="Base spec model")
     parser.add_argument('--spec-prefill', action='store_true', help="Whether to use speculative prefill")
     parser.add_argument('--exp', type=str, default=None, help="Experiment name. ")
     parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E. ")
@@ -94,7 +95,7 @@ if __name__ == "__main__":
         sys.path.append("../../")
         from speculative_prefill import enable_prefill_spec
         enable_prefill_spec(
-            spec_model='meta-llama/Llama-3.2-1B-Instruct', 
+            spec_model=args.spec_model, 
             spec_config_path='./local/config.yaml'
         )
 
