@@ -1,9 +1,15 @@
+import os
+
 from speculative_prefill import enable_prefill_spec
 
-enable_prefill_spec(
-    spec_model='meta-llama/Llama-3.2-1B-Instruct', 
-    spec_config_path='./local/config.yaml'
-)
+spec_model = os.environ.get(
+    "ENABLE_SP", None)
+
+if spec_model:
+    enable_prefill_spec(
+        spec_model=spec_model, 
+        spec_config_path='./local/config.yaml'
+    )
 
 from evalplus.evaluate import main
 
