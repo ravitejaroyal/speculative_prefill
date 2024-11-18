@@ -16,15 +16,19 @@
 
 import argparse
 import json
+import os
 from typing import AsyncGenerator
 
 from speculative_prefill import enable_prefill_spec
 
-# monkey patch must be placed before everything
-enable_prefill_spec(
-    spec_model='meta-llama/Llama-3.2-1B-Instruct', 
-    spec_config_path='./local/config.yaml'
-)
+spec_model = os.environ.get(
+    "ENABLE_SP", None)
+
+if spec_model:
+    enable_prefill_spec(
+        spec_model=spec_model, 
+        spec_config_path='./local/config.yaml'
+    )
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -106,11 +110,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     engine_args: AsyncEngineArgs = AsyncEngineArgs.from_cli_args(args)
-    engine_args.gpu_memory_utilization = 0.6
     engine_args.enable_chunked_prefill = False
     engine_args.enforce_eager = True
     engine_args.disable_custom_all_reduce = True
-    engine_args.max_model_len = 32768
+    engine_args.max_model_len = 131072
 
     engine = AsyncLLMEngine.from_engine_args(engine_args)
 
