@@ -29,7 +29,7 @@ wait
 
 for exp in "p3" "p5" "p7" "p9" "p3_full" "p5_full" "p7_full" "p9_full" "p3_full_lah4" "p5_full_lah4" "p7_full_lah4" "p9_full_lah4"; do
     {
-        CUDA_VISIBLE_DEVICES=0,1,2,3 ENABLE_SP=meta-llama/Meta-Llama-3.1-8B-Instruct SPEC_CONFIG_PATH=./local/config_${exp}.yaml python -m eval.evalplus \
+        CUDA_VISIBLE_DEVICES=0,1,2,3 ENABLE_SP=meta-llama/Meta-Llama-3.1-8B-Instruct SPEC_CONFIG_PATH=./configs/config_${exp}.yaml python -m eval.evalplus \
             --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
             --dataset humaneval \
             --backend vllm \
@@ -40,7 +40,7 @@ for exp in "p3" "p5" "p7" "p9" "p3_full" "p5_full" "p7_full" "p9_full" "p3_full_
     } & 
     
     {
-        CUDA_VISIBLE_DEVICES=4,5,6,7 ENABLE_SP=meta-llama/Meta-Llama-3.1-8B-Instruct SPEC_CONFIG_PATH=./local/config_${exp}.yaml python -m eval.evalplus \
+        CUDA_VISIBLE_DEVICES=4,5,6,7 ENABLE_SP=meta-llama/Meta-Llama-3.1-8B-Instruct SPEC_CONFIG_PATH=./configs/config_${exp}.yaml python -m eval.evalplus \
             --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
             --dataset mbpp \
             --backend vllm \

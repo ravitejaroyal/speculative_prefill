@@ -17,7 +17,7 @@ python -m speculative_prefill.vllm_benchmarks.latency \
 """
 
 SP_COMMAND = """
-SPEC_CONFIG_PATH=./local/config_{sp}.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+SPEC_CONFIG_PATH=./configs/config_{sp}.yaml python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \

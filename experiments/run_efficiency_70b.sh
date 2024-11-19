@@ -14,7 +14,7 @@ python -m speculative_prefill.vllm_benchmarks.latency \
     --num-iters-warmup 4 \
     --num-iters 16 > $output_dir/baseline_tp8_bs32_sl8k.txt
 
-SPEC_CONFIG_PATH=./local/config_p1.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+SPEC_CONFIG_PATH=./configs/config_p1.yaml python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
@@ -29,7 +29,7 @@ SPEC_CONFIG_PATH=./local/config_p1.yaml python -m speculative_prefill.vllm_bench
     --num-iters-warmup 4 \
     --num-iters 16 > $output_dir/spec_p1_tp8_bs32_sl8k.txt
 
-SPEC_CONFIG_PATH=./local/config_p9.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+SPEC_CONFIG_PATH=./configs/config_p9.yaml python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
@@ -44,7 +44,7 @@ SPEC_CONFIG_PATH=./local/config_p9.yaml python -m speculative_prefill.vllm_bench
     --num-iters-warmup 4 \
     --num-iters 16 > $output_dir/spec_p9_tp8_bs32_sl8k.txt
 
-SPEC_CONFIG_PATH=./local/config_p7.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+SPEC_CONFIG_PATH=./configs/config_p7.yaml python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
@@ -59,7 +59,7 @@ SPEC_CONFIG_PATH=./local/config_p7.yaml python -m speculative_prefill.vllm_bench
     --num-iters-warmup 4 \
     --num-iters 16 > $output_dir/spec_p7_tp8_bs32_sl8k.txt
 
-SPEC_CONFIG_PATH=./local/config_p5.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+SPEC_CONFIG_PATH=./configs/config_p5.yaml python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
@@ -74,7 +74,7 @@ SPEC_CONFIG_PATH=./local/config_p5.yaml python -m speculative_prefill.vllm_bench
     --num-iters-warmup 4 \
     --num-iters 16 > $output_dir/spec_p5_tp8_bs32_sl8k.txt
 
-SPEC_CONFIG_PATH=./local/config_p3.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+SPEC_CONFIG_PATH=./configs/config_p3.yaml python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
