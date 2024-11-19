@@ -13,10 +13,7 @@ from tqdm import tqdm
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct", choices=[
-        "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-        "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-    ])
+    parser.add_argument('--model', type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
     parser.add_argument('--spec-model', type=str, default='meta-llama/Llama-3.2-1B-Instruct', help="Base spec model")
     parser.add_argument('--spec-prefill', action='store_true', help="Whether to use speculative prefill")
     parser.add_argument('--exp', type=str, default=None, help="Experiment name. ")
