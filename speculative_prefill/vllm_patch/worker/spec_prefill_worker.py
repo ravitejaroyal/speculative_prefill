@@ -58,8 +58,9 @@ def create_spec_worker(*args, **kwargs) -> "SpecPrefillWorker":
         rope_theta=model_config.rope_theta,
         tokenizer_revision=model_config.tokenizer_revision,
         max_model_len=model_config.max_model_len,
-        quantization=model_config.quantization,
-        quantization_param_path=model_config.quantization_param_path,
+        # explicitly set quantization to null
+        quantization=None,
+        quantization_param_path=None,
         enforce_eager=model_config.enforce_eager,
         max_seq_len_to_capture=model_config.max_seq_len_to_capture,
         max_logprobs=model_config.max_logprobs,
