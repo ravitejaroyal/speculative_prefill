@@ -16,6 +16,7 @@ def parse_args(args=None):
     parser.add_argument('--model', type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
     parser.add_argument('--spec-model', type=str, default='meta-llama/Llama-3.2-1B-Instruct', help="Base spec model")
     parser.add_argument('--spec-prefill', action='store_true', help="Whether to use speculative prefill")
+    parser.add_argument('--disable-custom-all-reduce', action='store_true', help="Disable custom all reduce")
     parser.add_argument('--exp', type=str, default=None, help="Experiment name. ")
     parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E. ")
     parser.add_argument('--no-8k', action='store_true', help="Exclude >8k samples. ")
@@ -109,6 +110,8 @@ if __name__ == "__main__":
         max_model_len=65536, # this will include all examples in long bench
         enforce_eager=True, 
         enable_chunked_prefill=False, 
+        disable_custom_all_reduce=args.disable_custom_all_reduce, 
+        max_num_seqs=(4 if "405B" in model_name else 256), 
     )
 
     # build dataset
