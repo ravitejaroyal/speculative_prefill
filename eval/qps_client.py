@@ -10,6 +10,7 @@ import asyncio
 import json
 import random
 import time
+from datetime import datetime
 
 import numpy as np
 import openai
@@ -112,8 +113,9 @@ async def main(args):
 
     responses = []
 
-    for (prompt, max_tokens, query_type) in samples:
+    for idx, (prompt, max_tokens, query_type) in enumerate(samples):
         await asyncio.sleep(1 / args.qps)
+        print(f"[{datetime.now().strftime('%Hh:%Mm:%Ss')}] Send request {idx + 1}/{len(samples)}")
         responses.append(asyncio.create_task(send_query(
             client=client, 
             model=args.model, 
