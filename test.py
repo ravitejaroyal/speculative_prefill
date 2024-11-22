@@ -3,7 +3,7 @@ from speculative_prefill import enable_prefill_spec
 # monkey patch must be placed before everything
 enable_prefill_spec(
     spec_model='meta-llama/Llama-3.2-1B-Instruct', 
-    spec_config_path='./local/config.yaml'
+    spec_config_path='./configs/config_p1_full_lah8.yaml'
 )
 
 from vllm import LLM, SamplingParams
