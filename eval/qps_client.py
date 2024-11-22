@@ -12,12 +12,12 @@ import time
 import openai
 
 
-async def send_query(client, prompt, timeout, max_tokens):
+async def send_query(client, model, prompt, timeout, max_tokens):
     start_time = time.time()
     
     try:
         response = await client.chat.completions.create(
-            model="meta-llama/Meta-Llama-3.1-8B-Instruct",
+            model=model,
             messages=[{"role": "user", "content": prompt}], 
             max_tokens=max_tokens, 
             timeout=timeout
@@ -56,6 +56,7 @@ async def main(args):
         print("Send")
         responses.append(asyncio.create_task(send_query(
             client=client, 
+            model=args.model, 
             prompt=prompt, 
             max_tokens=args.max_tokens, 
             timeout=args.timeout
@@ -73,6 +74,9 @@ async def main(args):
 
 def parse_args():    
     parser = argparse.ArgumentParser(description="QPS client parser.")
+
+    # model related info
+    parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
 
     # server related args
     parser.add_argument("--qps", type=float, default=1.0)
