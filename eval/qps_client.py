@@ -5,31 +5,21 @@
     And calculates the statistics:
         - average query latency
 """
+import argparse
 import asyncio
 import time
 
 import openai
 
-HOST_NAME = "localhost"
-PORT = 8888
-API_KEY = "local_server"
 
-TIMEOUT = 5.0
-QPS = 1.5
-
-client = openai.AsyncOpenAI(
-    base_url=f"http://{HOST_NAME}:{PORT}/v1", 
-    api_key=API_KEY
-)
-
-async def send_query(prompt, timeout, max_completion_tokens=32):
+async def send_query(client, prompt, timeout, max_tokens):
     start_time = time.time()
     
     try:
         response = await client.chat.completions.create(
             model="meta-llama/Meta-Llama-3.1-8B-Instruct",
             messages=[{"role": "user", "content": prompt}], 
-            max_completion_tokens=max_completion_tokens, 
+            max_tokens=max_tokens, 
             timeout=timeout
         )
 
@@ -43,30 +33,37 @@ async def send_query(prompt, timeout, max_completion_tokens=32):
         raise Exception(f"Exception: {e}")
 
 
-async def main():
-    print(f"Profiling server with {QPS} QPS and {TIMEOUT}s timeout")
+async def main(args):
+    print(f"Profiling server with {args.qps} QPS and {args.timeout}s timeout")
 
-    input_text = ""
+    client = openai.AsyncOpenAI(
+        base_url=f"http://{args.host_name}:{args.port}/v1", 
+        api_key=args.api_key
+    )
+
+    prompt = ""
     for i in range(1500):
-        input_text += f"line {i}, key: 123456\n"
-    input_text += "line 1500, key: 245678\n"
+        prompt += f"line {i}, key: 123456\n"
+    prompt += "line 1500, key: 245678\n"
     for i in range(300):
-        input_text += f"line {1501 + i}, key: 123456\n"
-    input_text += "\nWhich line is the key 245678?"
+        prompt += f"line {1501 + i}, key: 123456\n"
+    prompt += "\nWhich line is the key 245678?"
 
     responses = []
 
-    for _ in range(5):
-        await asyncio.sleep(1 / QPS)
+    for _ in range(args.num_samples):
+        await asyncio.sleep(1 / args.qps)
         print("Send")
         responses.append(asyncio.create_task(send_query(
-            input_text, 
-            timeout=TIMEOUT
+            client=client, 
+            prompt=prompt, 
+            max_tokens=args.max_tokens, 
+            timeout=args.timeout
         )))
 
-    result = await asyncio.gather(*responses)
+    results = await asyncio.gather(*responses)
 
-    latency, _ = zip(*result)
+    latency, _ = zip(*results)
 
     if any([l is None for l in latency]):
         print(f"Found timeout in queries")
@@ -74,5 +71,23 @@ async def main():
         print(f"Average latency: {sum(latency) / len(latency):.3f}s")
 
 
+def parse_args():    
+    parser = argparse.ArgumentParser(description="QPS client parser.")
+
+    # server related args
+    parser.add_argument("--qps", type=float, default=1.0)
+    parser.add_argument("--timeout", type=float, default=10.0)
+    parser.add_argument("--host-name", type=str, default="localhost")
+    parser.add_argument("--port", type=str, default="8888")
+    parser.add_argument("--api-key", type=str, default="local_server")
+
+    # data related args
+    parser.add_argument("--num-samples", type=int, default=20)
+    parser.add_argument("--max-tokens", type=int, default=32)
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    args = parse_args()
+    asyncio.run(main(args))
