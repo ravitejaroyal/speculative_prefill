@@ -1,41 +1,33 @@
-SIZE=${2:-"70B"}
-API_KEY=${3:-local_server}
-PORT=${4:-8888}
+# bash eval/qps_server.sh
+# SPEC_CONFIG_PATH=./configs/config_p3_full.yaml ENABLE_SP="meta-llama/Meta-Llama-3.1-8B-Instruct" bash eval/qps_server.sh
 
-SPEC_NAME=meta-llama/Meta-Llama-3.1-8B-Instruct
-MODEL_NAME=meta-llama/Meta-Llama-3.1-${SIZE}-Instruct
+SIZE=${1:-"70B"}
+API_KEY=${2:-local_server}
+PORT=${3:-8888}
 
-echo "Using port ${PORT} and api key ${API_KEY}"
+if [ $SIZE == "70B" ]; then
+    MODEL_NAME=meta-llama/Meta-Llama-3.1-70B-Instruct
+elif [ $SIZE == "405B" ]; then
+    echo "When using 405B model, it is recommended to run on 8xH200."
+    MODEL_NAME=neuralmagic/Meta-Llama-3.1-405B-Instruct-FP8
+else
+    echo "Invalid model size"
+    exit 1
+fi
+
+echo "Starting vllm server using port ${PORT} and api key ${API_KEY}"
 
 fuser -n tcp ${PORT}
 
-if [ "$1" = "native" ]; then
-    echo "Starting native vllm serving"
-    python -m speculative_prefill.scripts serve \
-        ${MODEL_NAME} \
-        --dtype auto \
-        --max-model-len 65536 \
-        --gpu-memory-utilization 0.9 \
-        --enable-chunked-prefill=False \
-        --tensor-parallel-size 8 \
-        --enforce-eager \
-        --max-num-seqs 128 \
-        --api-key=$API_KEY \
-        --port=$PORT
-
-elif [ "$1" = "spec_prefill" ]; then
-    echo "Starting vllm serving with speculative prefill" 
-    SPEC_CONFIG_PATH=./configs/config_p1_full_lah8.yaml ENABLE_SP=$SPEC_NAME python -m speculative_prefill.scripts serve \
-        ${MODEL_NAME} \
-        --dtype auto \
-        --max-model-len 65536 \
-        --gpu-memory-utilization 0.9 \
-        --enable-chunked-prefill=False \
-        --tensor-parallel-size 8 \
-        --enforce-eager \
-        --max-num-seqs 128 \
-        --api-key=$API_KEY \
-        --port=$PORT
-else
-    echo "Invalid serving type..."
-fi
+python -m speculative_prefill.scripts serve \
+    ${MODEL_NAME} \
+    --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+    --dtype auto \
+    --max-model-len 65536 \
+    --gpu-memory-utilization 0.8 \
+    --enable-chunked-prefill=False \
+    --tensor-parallel-size 8 \
+    --enforce-eager \
+    --max-num-seqs 256 \
+    --api-key=$API_KEY \
+    --port=$PORT
