@@ -115,7 +115,8 @@ async def main(args):
 
     for idx, (prompt, max_tokens, query_type) in enumerate(samples):
         await asyncio.sleep(1 / args.qps)
-        print(f"[{datetime.now().strftime('%Hh:%Mm:%Ss')}] Send request {idx + 1}/{len(samples)}")
+        if args.log_send:
+            print(f"[{datetime.now().strftime('%Hh:%Mm:%Ss')}] Send request {idx + 1}/{len(samples)}")
         responses.append(asyncio.create_task(send_query(
             client=client, 
             model=args.model, 
@@ -143,10 +144,11 @@ def parse_args():
 
     # server related args
     parser.add_argument("--qps", type=float, default=1.0)
-    parser.add_argument("--timeout", type=float, default=10.0)
+    parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--host-name", type=str, default="localhost")
     parser.add_argument("--port", type=str, default="8888")
     parser.add_argument("--api-key", type=str, default="local_server")
+    parser.add_argument("--log-send", action="store_true")
 
     # data related args
     parser.add_argument("--seed", type=int, default=227)
