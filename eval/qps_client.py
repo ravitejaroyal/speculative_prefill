@@ -62,6 +62,9 @@ async def send_query(
 
 def prepare_datasets(category, num_samples):
     dataset_map = {
+        "single-doc-qa": [
+            "qasper", "narrativeqa", "multifieldqa_zh", "multifieldqa_en"
+        ], 
         "multi-doc-qa": [
             "dureader", "2wikimqa", "musique", "hotpotqa"
         ], 
@@ -104,6 +107,9 @@ async def main(args):
     print(f"Generating data in {args.category} with {args.num_samples} samples per dataset.")
     samples = prepare_datasets(args.category, args.num_samples)
 
+    assert args.max_tolerence >= 0
+    assert len(samples) > args.max_tolerence
+
     print(f"Profiling server with {args.qps} QPS and {args.timeout}s timeout")
 
     client = openai.AsyncOpenAI(
@@ -129,11 +135,12 @@ async def main(args):
     results = await asyncio.gather(*responses)
 
     latency, _ = zip(*results)
+    filtered_latency = [l for l in latency if l is not None]
 
-    if any([l is None for l in latency]):
+    if (len(latency) - len(filtered_latency)) > args.max_tolerence:
         print(f"Found timeout in queries")
     else:
-        print(f"Average latency: {sum(latency) / len(latency):.3f}s")
+        print(f"Average latency: {sum(filtered_latency) / len(filtered_latency):.3f}s")
 
 
 def parse_args():    
@@ -153,10 +160,12 @@ def parse_args():
     # data related args
     parser.add_argument("--seed", type=int, default=227)
     parser.add_argument("--category", type=str, default="multi-doc-qa", choices=[
-        "multi-doc-qa", "summarization", "few-shot-learning"
+        "single-doc-qa", "multi-doc-qa", "summarization", "few-shot-learning"
     ])
     parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--num-samples", type=int, default=20)
+    # used here to ignore some tokens being timeout due to network or other factors
+    parser.add_argument("--max-tolerence", type=int, default=4)
 
     return parser.parse_args()
 
