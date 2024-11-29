@@ -113,7 +113,6 @@ if __name__ == "__main__":
         enable_chunked_prefill=False, 
         disable_custom_all_reduce=args.disable_custom_all_reduce, 
         cpu_offload_gb=args.cpu_offload_gb, 
-        max_num_seqs=(4 if "405B" in model_name else 256), 
     )
 
     # build dataset
