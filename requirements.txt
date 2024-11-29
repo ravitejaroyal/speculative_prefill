@@ -7,3 +7,4 @@ jieba==0.42.1
 fuzzywuzzy==0.18.0
 rouge==1.0.1
 python-Levenshtein
+sentence-transformers
