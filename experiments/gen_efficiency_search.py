@@ -1,19 +1,33 @@
-output_dir = "./experiments/run_efficiency_search_70b.sh"
+output_dir = "./experiments/run_efficiency_search.sh"
 
 TOTAL_TOKEN = 128 * 4096
 
-BASELINE_COMMAND = """
+BASELINE_8B_COMMAND = """
+python -m speculative_prefill.vllm_benchmarks.latency \
+    --model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+    --enforce-eager \
+    --enable-chunked-prefill False \
+    --tensor-parallel-size 8 \
+    --max_model_len 32768 \
+    --input-len {seq_len} \
+    --output-len 1 \
+    --batch-size {bs} \
+    --num-iters-warmup 4 \
+    --num-iters 16 > $output_dir/baseline_8B_bs{bs}_sl{seq_len}.txt
+"""
+
+BASELINE_70B_COMMAND = """
 python -m speculative_prefill.vllm_benchmarks.latency \
     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
-    --max_model_len 32832 \
+    --max_model_len 32768 \
     --input-len {seq_len} \
     --output-len 1 \
     --batch-size {bs} \
     --num-iters-warmup 4 \
-    --num-iters 16 > $output_dir/baseline_bs{bs}_sl{seq_len}.txt
+    --num-iters 16 > $output_dir/baseline_70B_bs{bs}_sl{seq_len}.txt
 """
 
 SP_COMMAND = """
@@ -24,12 +38,12 @@ SPEC_CONFIG_PATH=./configs/config_{sp}.yaml python -m speculative_prefill.vllm_b
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
-    --max_model_len 32832 \
+    --max_model_len 32768 \
     --input-len {seq_len} \
     --output-len 1 \
     --batch-size {bs} \
     --num-iters-warmup 4 \
-    --num-iters 16 > $output_dir/spec_{sp}_bs{bs}_sl{seq_len}.txt
+    --num-iters 16 > $output_dir/spec_70B8B_{sp}_bs{bs}_sl{seq_len}.txt
 """
 
 with open(output_dir, 'w') as f:
@@ -38,7 +52,13 @@ with open(output_dir, 'w') as f:
 
     for bs in [128, 64, 32, 16]:
         seq_len = TOTAL_TOKEN // bs
-        f.write(BASELINE_COMMAND.format(
+        
+        f.write(BASELINE_8B_COMMAND.format(
+            seq_len=seq_len, 
+            bs=bs
+        ))
+        
+        f.write(BASELINE_70B_COMMAND.format(
             seq_len=seq_len, 
             bs=bs
         ))
