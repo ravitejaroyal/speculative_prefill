@@ -2,12 +2,14 @@ import argparse
 import json
 import os
 import random
+import sys
 
 import numpy as np
 import torch
 from datasets import load_dataset
 from tqdm import tqdm
 
+sys.path.append("../../")
 from rag_baseline.rag_model import RagConfig, RagLlama
 
 
@@ -17,7 +19,7 @@ def parse_args(args=None):
     parser.add_argument('--exp', type=str, default=None, help="Experiment name. ")
     parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E. ")
     parser.add_argument('--no-8k', action='store_true', help="Exclude >8k samples. ")
-    parser.add_argument('--percentage', type=int, default=0.5)
+    parser.add_argument('--percentage', type=float, default=0.5)
 
     return parser.parse_args(args)
 
@@ -113,6 +115,8 @@ if __name__ == "__main__":
         output_path_base = f"../../local/long_bench/pred/{exp_name}"
     os.makedirs(output_path_base, exist_ok=True)
 
+    stats = {}
+
     for dataset_name in datasets:
         if args.e:
             data = load_dataset('THUDM/LongBench', f"{dataset_name}_e", split='test')
@@ -133,3 +137,14 @@ if __name__ == "__main__":
             output_path=output_path, 
             no_8k=args.no_8k
         )
+
+        num_queries, avg_keep_percentage = model.print_stats()
+        model.reset_stats()
+
+        stats[dataset_name] = {
+            "num_queries": num_queries, 
+            "avg_keep_percentage": avg_keep_percentage
+        }
+
+    with open(os.path.join(output_path_base, "stats.json"), 'w') as f:
+        json.dump(stats, f)

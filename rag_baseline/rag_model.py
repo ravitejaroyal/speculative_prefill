@@ -47,9 +47,11 @@ class RagLlama:
     def print_stats(self):
         if self.num_queries == 0:
             print("Currently no processed queries. ")
+            avg_ratio = None
         else:
-            print(f"Processed {self.num_queries} queries with avg {(self.ratio / self.num_queries) * 100:.2f}% keep ratio.")
-        return self.num_queries, self.ratio
+            avg_ratio = self.ratio / self.num_queries
+            print(f"Processed {self.num_queries} queries with avg {avg_ratio * 100:.2f}% keep ratio.")
+        return self.num_queries, avg_ratio
 
     def update_stats(self, ratio):
         self.num_queries += 1
@@ -88,7 +90,7 @@ class RagLlama:
             context_emb = embeddings[:-1]
             sim = torch.matmul(context_emb, query_emb[:, None]).view(-1)
             _, indices = torch.topk(sim, k=math.ceil(
-                self.rag_config.keep_percentage * len((chunks))
+                self.rag_config.keep_percentage * (len(chunks) - 1)
             ), dim=-1)
             indices, _ = torch.sort(indices, dim=0)
 
