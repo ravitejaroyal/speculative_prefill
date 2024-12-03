@@ -140,7 +140,6 @@ ax.xaxis.grid(False)
 ax.yaxis.grid(False)
 ax.set_xticks([])
 ax.set_yticks([])
-ax.set_title("LongBench Prompt Length\nAcross Categories", fontweight='bold', y=0.1)
 
 plt.tight_layout()
 plt.subplots_adjust(bottom=-0.1)
