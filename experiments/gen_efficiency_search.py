@@ -16,23 +16,23 @@ python -m speculative_prefill.vllm_benchmarks.latency \
     --num-iters 16 > $output_dir/baseline_8B_bs{bs}_sl{seq_len}.txt
 """
 
-# BASELINE_70B_COMMAND = """
-# python -m speculative_prefill.vllm_benchmarks.latency \
-#     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
-#     --enforce-eager \
-#     --enable-chunked-prefill False \
-#     --tensor-parallel-size 8 \
-#     --max_model_len 32768 \
-#     --input-len {seq_len} \
-#     --output-len 1 \
-#     --batch-size {bs} \
-#     --num-iters-warmup 4 \
-#     --num-iters 16 > $output_dir/baseline_70B_bs{bs}_sl{seq_len}.txt
-# """
+BASELINE_70B_COMMAND = """
+python -m speculative_prefill.vllm_benchmarks.latency \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
+    --enforce-eager \
+    --enable-chunked-prefill False \
+    --tensor-parallel-size 8 \
+    --max_model_len 32768 \
+    --input-len {seq_len} \
+    --output-len 1 \
+    --batch-size {bs} \
+    --num-iters-warmup 4 \
+    --num-iters 16 > $output_dir/baseline_70B_bs{bs}_sl{seq_len}.txt
+"""
 
 BASELINE_405B_COMMAND = """
 python -m speculative_prefill.vllm_benchmarks.latency \
-    --model "" \
+    --model "neuralmagic/Meta-Llama-3.1-405B-Instruct-FP8" \
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
@@ -44,25 +44,25 @@ python -m speculative_prefill.vllm_benchmarks.latency \
     --num-iters 16 > $output_dir/baseline_405B_bs{bs}_sl{seq_len}.txt
 """
 
-# SP_70B_COMMAND = """
-# SPEC_CONFIG_PATH=./configs/config_{sp}.yaml python -m speculative_prefill.vllm_benchmarks.latency \
-#     --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
-#     --spec-prefill \
-#     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-#     --enforce-eager \
-#     --enable-chunked-prefill False \
-#     --tensor-parallel-size 8 \
-#     --max_model_len 32768 \
-#     --input-len {seq_len} \
-#     --output-len 1 \
-#     --batch-size {bs} \
-#     --num-iters-warmup 4 \
-#     --num-iters 16 > $output_dir/spec_70B8B_{sp}_bs{bs}_sl{seq_len}.txt
-# """
+SP_70B_COMMAND = """
+SPEC_CONFIG_PATH=./configs/config_{sp}.yaml python -m speculative_prefill.vllm_benchmarks.latency \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
+    --spec-prefill \
+    --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+    --enforce-eager \
+    --enable-chunked-prefill False \
+    --tensor-parallel-size 8 \
+    --max_model_len 32768 \
+    --input-len {seq_len} \
+    --output-len 1 \
+    --batch-size {bs} \
+    --num-iters-warmup 4 \
+    --num-iters 16 > $output_dir/spec_70B8B_{sp}_bs{bs}_sl{seq_len}.txt
+"""
 
 SP_405B_COMMAND = """
 SPEC_CONFIG_PATH=./configs/config_{sp}.yaml python -m speculative_prefill.vllm_benchmarks.latency \
-    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
+    --model "neuralmagic/Meta-Llama-3.1-405B-Instruct-FP8" \
     --spec-prefill \
     --spec-model "meta-llama/Meta-Llama-3.1-8B-Instruct" \
     --enforce-eager \
@@ -88,10 +88,10 @@ with open(output_dir, 'w') as f:
             bs=bs
         ))
         
-        # f.write(BASELINE_70B_COMMAND.format(
-        #     seq_len=seq_len, 
-        #     bs=bs
-        # ))
+        f.write(BASELINE_70B_COMMAND.format(
+            seq_len=seq_len, 
+            bs=bs
+        ))
 
         f.write(BASELINE_405B_COMMAND.format(
             seq_len=seq_len, 
@@ -100,11 +100,11 @@ with open(output_dir, 'w') as f:
 
         for sp in ["p1", "p3", "p5", "p7", 
             "p1_full_lah8", "p3_full_lah8", "p5_full_lah8", "p7_full_lah8"]:
-            # f.write(SP_70B_COMMAND.format(
-            #     sp=sp, 
-            #     seq_len=seq_len, 
-            #     bs=bs
-            # ))
+            f.write(SP_70B_COMMAND.format(
+                sp=sp, 
+                seq_len=seq_len, 
+                bs=bs
+            ))
 
             f.write(SP_405B_COMMAND.format(
                 sp=sp, 
