@@ -90,7 +90,7 @@ ANGLES = np.linspace(0, 2 * np.pi, num=ANGLES_N, endpoint=False)
 WIDTH = (2 * np.pi) / len(ANGLES)
 
 # Obtain size of each group
-GROUPS_SIZE = [len(i[1]) for i in df.groupby("group")]
+GROUPS_SIZE = [len(c) for c in categories.values()]
 
 # Obtaining the right indexes is now a little more complicated
 offset = 0
@@ -103,7 +103,6 @@ for size in GROUPS_SIZE:
 fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": "polar"})
 
 cmap = plt.get_cmap("viridis", 6)
-GROUPS_SIZE = [len(i[1]) for i in df.groupby("group")]
 COLORS = [cmap(i) for i, size in enumerate(GROUPS_SIZE) for _ in range(size)]
 
 ax.bar(
