@@ -53,7 +53,10 @@ async def send_query(
         end_time = time.time()
         latency = end_time - start_time
 
-        return latency, answer
+        if latency < timeout:
+            return latency, answer
+        else:
+            return None, "Empty response"
     except openai.APITimeoutError as e:
         return None, "Empty response"
     except Exception as e:
