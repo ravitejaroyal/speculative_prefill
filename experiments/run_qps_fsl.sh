@@ -28,7 +28,7 @@ python3 eval/qps_client.py \
 echo "Start real profiling"
 echo "" > $OUTPUT_DIR/${SIZE}_${2}_ttft_${CATEGORY}.txt
 
-for qps in 0.2 0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4 2.6 2.8 3.0; do
+for qps in 0.2 0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4 2.6 2.8 3.0 3.2; do
     echo "Sleep for 10 seconds"
     sleep 10
     python3 eval/qps_client.py \

@@ -1,5 +1,5 @@
 OUTPUT_DIR="./local/outputs/qps"
-TIMEOUT=20
+TIMEOUT=10
 NUM_SAMPLES=32
 mkdir -p $OUTPUT_DIR
 
@@ -28,7 +28,7 @@ python3 eval/qps_client.py \
 echo "Start real profiling"
 echo "" > $OUTPUT_DIR/${SIZE}_${2}_ttft_${CATEGORY}.txt
 
-for qps in 0.2 0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4 2.6 2.8 3.0; do
+for qps in 0.2 0.6 1.0 1.4 1.8 2.2 2.6 3.0 3.4 3.8 4.2 4.6 5.0; do
     echo "Sleep for 10 seconds"
     sleep 10
     python3 eval/qps_client.py \
