@@ -7,12 +7,12 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 
 categories = {
+    "Summarization": ["gov_report", "qmsum", "multi_news", "vcsum"], 
     "Single-Document QA": ["narrativeqa", "qasper", "multifieldqa_en", "multifieldqa_zh"], 
     "Multi-Document QA": ["hotpotqa", "2wikimqa", "musique", "dureader"], 
     "Few-Shot Learning": ["trec", "triviaqa", "samsum", "lsht"], 
     "Synthetic Tasks": ["passage_count", "passage_retrieval_en", "passage_retrieval_zh"], 
     "Code Completion": ["lcc", "repobench-p"], 
-    "Summarization": ["gov_report", "qmsum", "multi_news", "vcsum"], 
 }
 
 dataset2prompt = json.load(open("./configs/dataset2prompt.json", "r"))
@@ -114,12 +114,12 @@ add_labels(ANGLES[IDXS], VALUES, LABELS, OFFSET, ax)
 
 offset = 0 
 for group, size in zip([
+    "Sum",
     "Single-Doc\nQA",
     "Multi-Doc\nQA",
     "Few-Shots\nLearning",
     "Synthetic\nTasks", 
     "Code\nCompletion", 
-    "Sum",
 ], GROUPS_SIZE):
     # Add line below bars
     x1 = np.linspace(ANGLES[offset + PAD], ANGLES[offset + size + PAD - 1], num=100)
