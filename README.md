@@ -29,5 +29,18 @@ llm = LLM(
 )
 ```
 
+## Evaluation
+To reproduce the results from the paper, we include scripts in `experiments`. But before running these scripts, be sure to setup some configurations: 
+
+* Move all lm_eval configs in `eval/lm_eval_patch` to the corresponding place in your lm_eval library. These files contain special templates for Llama 3.1 and 3.2.
+* For [RULER](https://github.com/NVIDIA/RULER/tree/main) experiments, we recommend following `run_ruler.md` and launch a client using RULER's official script.
+* All other experiments can be launched by running
+```bash
+bash experiments/run_{task_of_interest}.sh
+```
+
+All results will be saved in a local folder called `local`. 
+
+
 ## Citation
 If you found our work to be useful, please cite our paper: 
