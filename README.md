@@ -5,7 +5,20 @@ Speculative Prefill is a technique for accelerating LLM inference via token impo
 
 Speculative Prefill achieves impressive TTFT reduction on many downstream tasks, including LongBench and RULER. The implementation is based on vLLM. 
 
+## Performance
+Speculative Prefill greatly improves maximum QPS that a system can support: 
+
+![image](./figs/qps.jpg?raw=true)
+
+In terms of downstream quality, Speculative Prefill can reserve quality with keeping only 10% of the tokens for many compressible tasks: 
+
+![image](./figs/longbench.jpg?raw=true)
+
 ## Getting Started
+Clone the repo and install required dependencies: 
+```bash
+pip3 install -r requirements.txt
+```
 
 ## Example Usage
 We just need to apply the monkey patch before native vLLM code. 
