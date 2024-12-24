@@ -20,6 +20,11 @@ Clone the repo and install required dependencies:
 pip3 install -r requirements.txt
 ```
 
+or install the package via pip:
+```bash
+pip3 install speculative_prefill
+```
+
 ## Example Usage
 We just need to apply the monkey patch before native vLLM code. 
 ```python
@@ -56,6 +61,15 @@ bash experiments/run_{task_of_interest}.sh
 
 All results will be saved in a local folder called `local`. 
 
+## WIP and Contributing
+We welcome everyone to try and contribute to the code! Here're some planned TODOs
+- [x] Make sure all experiments are reproducible in the paper.
+- [ ] Package release on pip.
+- [ ] Fix the problem of non `eager-mode`. 
+- [ ] Enable `chunked-prefill`.
+- [ ] Update to the latest vLLM version. 
+
+Since vLLM is updating very fast, we choose to keep this project as a monkey patch. Integrating into the main vLLM is extremely appreciated!!!
 
 ## Citation
 If you found our work to be useful, please cite our paper: 
