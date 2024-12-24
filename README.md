@@ -1,4 +1,5 @@
-# Speculative Prefill: Speeding up LLM Inference via Token Importance Transferability
+![image](./figs/logo.jpg?raw=true)
+# <p align=center> Speeding up LLM Inference via Token Importance Transferability
 
 ## About
 Speculative Prefill is a technique for accelerating LLM inference via token importance transferability. Essentially, Speculative Prefill adopts a smaller, usually cheaper, LLM as a "draft" model that speculates what tokens are contextually important. Only these tokens, along with their original position information are then sent to the main model for inference. 
@@ -6,7 +7,7 @@ Speculative Prefill is a technique for accelerating LLM inference via token impo
 Speculative Prefill achieves impressive TTFT reduction on many downstream tasks, including LongBench and RULER. The implementation is based on vLLM. 
 
 ## Performance
-Speculative Prefill greatly improves maximum QPS that a system can support: 
+Speculative Prefill greatly improves maximum QPS that a system can support (benchmarked on 8 x NVIDIA H200s): 
 
 ![image](./figs/qps.jpg?raw=true)
 
