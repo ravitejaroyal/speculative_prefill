@@ -8,10 +8,6 @@ enable_prefill_spec(
 
 from vllm import LLM, SamplingParams
 
-"""
-    HUGGING_FACE_HUB_TOKEN=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 python test.py
-"""
-
 llm = LLM(
     # 'meta-llama/Llama-3.2-1B-Instruct', 
     'meta-llama/Meta-Llama-3.1-8B-Instruct', 
