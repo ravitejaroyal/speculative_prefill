@@ -16,14 +16,20 @@ In terms of downstream quality, Speculative Prefill can reserve quality with kee
 ![image](./figs/longbench.jpg?raw=true)
 
 ## Getting Started
-Clone the repo and install required dependencies: 
+Create a conda environment: 
 ```bash
-pip3 install -r requirements.txt
+conda create -n sp python=3.10.15 -y
+conda activate sp
 ```
 
-or install the package via pip:
+Install via pip:
 ```bash
-pip3 install speculative_prefill
+pip3 install git+git://github.com/Jingyu6/speculative_prefill.git#egg=speculative_prefill
+```
+
+Or install from source. Clone the repo and install required dependencies: 
+```bash
+pip3 install -r requirements.txt
 ```
 
 ## Example Usage
