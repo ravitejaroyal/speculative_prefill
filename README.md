@@ -1,17 +1,21 @@
 ![image](./figs/logo.jpg?raw=true)
 # <p align=center> Speeding up LLM Inference via Token Importance Transferability
 
-## About
-Speculative Prefill is a technique for accelerating LLM inference via token importance transferability. Essentially, Speculative Prefill adopts a smaller, usually cheaper, LLM as a "draft" model that speculates what tokens are contextually important. Only these tokens, along with their original position information are then sent to the main model for inference. 
+[![Arxiv Paper](https://img.shields.io/badge/Arxiv-Paper-brightred)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+![](https://img.shields.io/badge/PRs-welcome-brightgreen) ![](https://img.shields.io/github/stars/Jingyu6/speculative_prefill?style=social) 
 
-Speculative Prefill achieves impressive TTFT reduction on many downstream tasks, including LongBench and RULER. The implementation is based on vLLM. 
+## About
+_Speculative Prefill_ is a technique for accelerating LLM inference via token importance transferability. Essentially, _Speculative Prefill_ adopts a smaller, usually cheaper, LLM as a "draft" model that speculates what tokens are contextually important. Only these tokens, along with their original position information are then sent to the main model for inference. 
+
+_Speculative Prefill_ achieves impressive TTFT reduction on many downstream tasks, including LongBench and RULER. The implementation is based on vLLM. 
 
 ## Performance
-Speculative Prefill greatly improves maximum QPS that a system can support (benchmarked on 8 x NVIDIA H200s): 
+_Speculative Prefill_ greatly improves maximum QPS that a system can support (benchmarked on 8 x NVIDIA H200s): 
 
 ![image](./figs/qps.jpg?raw=true)
 
-In terms of downstream quality, Speculative Prefill can reserve quality with keeping only 10% of the tokens for many compressible tasks: 
+In terms of downstream quality, _Speculative Prefill_ can reserve quality with keeping only 10% of the tokens for many compressible tasks: 
 
 ![image](./figs/longbench.jpg?raw=true)
 
