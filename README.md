@@ -27,8 +27,10 @@ Install via pip:
 pip3 install git+git://github.com/Jingyu6/speculative_prefill.git#egg=speculative_prefill
 ```
 
-Or install from source. Clone the repo and install required dependencies: 
+To reproduce all experiments, clone the repo and install required dependencies: 
 ```bash
+git clone https://github.com/Jingyu6/speculative_prefill.git
+cd speculative_prefill
 pip3 install -r requirements.txt
 ```
 
@@ -71,7 +73,7 @@ All results will be saved in a local folder called `local`.
 ## WIP and Contributing
 We welcome everyone to try and contribute to the code! Here're some planned TODOs
 - [x] Make sure all experiments are reproducible in the paper.
-- [ ] Package release on pip.
+- [x] Package the repo. 
 - [ ] Fix the problem of non `eager-mode`. 
 - [ ] Enable `chunked-prefill`.
 - [ ] Update to the latest vLLM version. 
