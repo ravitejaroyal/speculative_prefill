@@ -1,30 +1,17 @@
 import atexit
-import math
-from dataclasses import dataclass
-from enum import Enum
 
 import torch
-from nltk.tokenize import sent_tokenize
-from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, GenerationConfig, LlamaForCausalLM
 
+from rag_baseline.rag_utils import (retrieve_query_fn,
+                                    retrieve_relevant_sentences)
 
-class ChunkGranulairity(Enum):
-    SENTENCE = 1
-    BLOCK = 2
-
-@dataclass
-class RagConfig:
-    chunk_granulairty: ChunkGranulairity = ChunkGranulairity.SENTENCE
-    chunk_size: int = 32
-    keep_percentage: float = 0.5
 
 class RagLlama:
     def __init__(
         self, 
-        llama_model_name='meta-llama/Meta-Llama-3.1-8B-Instruct', 
-        encoder_model_name="gtr-t5-large", 
-        rag_config: RagConfig = RagConfig()
+        llama_model_name: str = 'meta-llama/Meta-Llama-3.1-8B-Instruct', 
+        percentage: float = 0.5
     ) -> None:
         self.llama = LlamaForCausalLM.from_pretrained(
             llama_model_name, 
@@ -33,8 +20,7 @@ class RagLlama:
             device_map="auto"
         )
         self.tokenizer = AutoTokenizer.from_pretrained(llama_model_name)
-        self.encoder = SentenceTransformer(encoder_model_name)
-        self.rag_config = rag_config
+        self.percentage = percentage
 
         # stats related stuffs
         self.reset_stats()
@@ -57,61 +43,51 @@ class RagLlama:
         self.num_queries += 1
         self.ratio += ratio
 
-    def split_prompt(self, prompt):
-        if self.rag_config.chunk_granulairty == ChunkGranulairity.SENTENCE:
-            return sent_tokenize(prompt)
-        elif self.rag_config.chunk_granulairty == ChunkGranulairity.BLOCK:
-            assert self.rag_config.chunk_size > 0
-            # roughly split evenly
-            total_char = len(prompt)
-            start = 0
-            blocks = []
-            while start < total_char:
-                end = min(start + self.rag_config.chunk_size, total_char)
-                blocks.append(prompt[start: end])
-                start = end
-            return blocks
-
     @torch.inference_mode
-    def greedy_generate(
+    def generate(
         self, 
-        prompt, 
-        max_gen, 
-        apply_chat_template=False
-    ):        
-        chunks = self.split_prompt(prompt)
-        if len(chunks) == 1:
-            new_prompt = prompt
-        else:
-            embeddings = torch.FloatTensor(self.encoder.encode(chunks, normalize_embeddings=True))
-            # [D]
-            query_emb = embeddings[-1]
-            # [N, D]
-            context_emb = embeddings[:-1]
-            sim = torch.matmul(context_emb, query_emb[:, None]).view(-1)
-            _, indices = torch.topk(sim, k=math.ceil(
-                self.rag_config.keep_percentage * (len(chunks) - 1)
-            ), dim=-1)
-            indices, _ = torch.sort(indices, dim=0)
+        context: str, 
+        input: str, 
+        prompt_format: str, 
+        dataset_name: str, 
+        max_gen: int, 
+        apply_chat_template: bool
+    ): 
+        # query used for retrieval
+        query = retrieve_query_fn(dataset_name=dataset_name)(input)
 
-            keep_chunks = []
-            for idx in indices:
-                keep_chunks.append(chunks[idx])
-            keep_chunks.append(chunks[-1])
-
-            new_prompt = " ".join(keep_chunks)
-        
+        # calculate original length of the prompt
+        ori_prompt = prompt_format.format(input=input, context=context)
         if apply_chat_template:
-            messages = [{'role': 'user', 'content': new_prompt}]
-            new_prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            messages = [{'role': 'user', 'content': prompt}]
-            ori_prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        else:
-            ori_prompt = prompt
+            messages = [{'role': 'user', 'content': ori_prompt}]
+            ori_prompt = self.tokenizer.apply_chat_template(
+                messages, 
+                tokenize=False, 
+                add_generation_prompt=True
+            )
+        inputs = self.tokenizer([ori_prompt], return_tensors='pt')
+        ori_len = inputs['input_ids'].shape[1]
 
-        inputs = self.tokenizer([new_prompt], return_tensors='pt')
+        # calculate retrieval length
+        ret_len = int(ori_len * self.percentage)
+
+        # rag part
+        ret_context = retrieve_relevant_sentences([context], [query], token_budgets=[ret_len])[0]
+
+        # assemble new prompt
+        rag_prompt = prompt_format.format(input=input, context=ret_context)
+        if apply_chat_template:
+            messages = [{'role': 'user', 'content': rag_prompt}]
+            rag_prompt = self.tokenizer.apply_chat_template(
+                messages, 
+                tokenize=False, 
+                add_generation_prompt=True
+            )
+        inputs = self.tokenizer([rag_prompt], return_tensors='pt')
         input_ids = inputs['input_ids'].to('cuda')
         attention_mask = inputs['attention_mask'].to('cuda')
+        final_len = input_ids.shape[1]
+        
         gen_config = GenerationConfig(
             do_sample=False, 
             eos_token_id=128009, 
@@ -119,9 +95,7 @@ class RagLlama:
         )
 
         # update stats
-        original_len = self.tokenizer([ori_prompt], return_tensors='pt')['input_ids'].shape[1]
-        new_len = input_ids.shape[1]
-        self.update_stats(new_len / original_len)
+        self.update_stats(final_len / ori_len)
 
         outputs = self.llama.generate(
             input_ids=input_ids,
@@ -131,16 +105,12 @@ class RagLlama:
             generation_config=gen_config
         )
 
-        generated_tokens = outputs.sequences[:, new_len:]
+        generated_tokens = outputs.sequences[:, final_len:]
 
         return self.tokenizer.decode(generated_tokens.tolist()[0], skip_special_tokens=True)
 
 if __name__ == "__main__":
-    # model = RagLlama(rag_config=RagConfig(
-    #     chunk_granulairty=ChunkGranulairity.BLOCK, 
-    #     chunk_size=32
-    # ))
-    model = RagLlama(rag_config=RagConfig(keep_percentage=0.1))
+    model = RagLlama()
     input_text = """
 During World War I and the 1920s there was a major expansion in industry. The availability of jobs attracted African Americans from the Southern United States. Between 1910 and 1930, the African American population of Chicago increased dramatically, from 44,103 to 233,903.[68] This Great Migration had an immense cultural impact, called the Chicago Black Renaissance, part of the New Negro Movement, in art, literature, and music.[69] Continuing racial tensions and violence, such as the Chicago race riot of 1919, also occurred.[70]
 The ratification of the 18th amendment to the Constitution in 1919 made the production and sale (including exportation) of alcoholic beverages illegal in the United States. This ushered in the beginning of what is known as the gangster era, a time that roughly spans from 1919 until 1933 when Prohibition was repealed. The 1920s saw gangsters, including Al Capone, Dion O'Banion, Bugs Moran and Tony Accardo battle law enforcement and each other on the streets of Chicago during the Prohibition era.[71] Chicago was the location of the infamous St. Valentine's Day Massacre in 1929, when Al Capone sent men to gun down members of a rival gang, North Side, led by Bugs Moran.[72]
@@ -168,4 +138,4 @@ On February 23, 2011, Rahm Emanuel, a former White House Chief of Staff and memb
 On May 15, 2023, Brandon Johnson assumed office as the 57th mayor of Chicago.
 How many times has "Chicago" been mentioned in the above text?
 """
-    print(model.greedy_generate(input_text, max_gen=32, apply_chat_template=True))
+    print(model.generate(input_text, max_gen=32, apply_chat_template=True))

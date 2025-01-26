@@ -10,7 +10,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 sys.path.append("../../")
-from rag_baseline.rag_model import RagConfig, RagLlama
+from rag_baseline.rag_model import RagLlama
 
 
 def parse_args(args=None):
@@ -48,20 +48,15 @@ def get_predictions(
     for json_obj in tqdm(data):
         if no_8k and json_obj["length"] >= 8000:
             continue
-        prompt = prompt_format.format(**json_obj)
-        if dataset_name in ["trec", "triviaqa", "samsum", "lsht", "lcc", "repobench-p"]:
-            # no template
-            pred = model.greedy_generate(
-               prompt, 
-               max_gen=max_gen, 
-               apply_chat_template=False
-            )
-        else:
-            pred = model.greedy_generate(
-               prompt, 
-               max_gen=max_gen, 
-               apply_chat_template=True
-            )
+        apply_chat_template = dataset_name not in ["trec", "triviaqa", "samsum", "lsht", "lcc", "repobench-p"]    
+        pred = model.generate(
+            context=json_obj["context"], 
+            input=json_obj["input"], 
+            prompt_format=prompt_format, 
+            dataset_name=dataset_name, 
+            max_gen=max_gen, 
+            apply_chat_template=apply_chat_template
+        )
         
         with open(output_path, "a", encoding="utf-8") as f:
             json.dump(
@@ -86,9 +81,7 @@ if __name__ == "__main__":
 
     model = RagLlama(
         llama_model_name=model_name, 
-        rag_config=RagConfig(
-            keep_percentage=args.percentage
-        )
+        percentage=args.percentage
     )
 
     # build dataset
@@ -97,14 +90,14 @@ if __name__ == "__main__":
             # get rid of triviaqa and lcc
             datasets = ["qasper", "multifieldqa_en", "hotpotqa", "2wikimqa", "gov_report", "multi_news", \
             "trec", "samsum", "passage_count", "passage_retrieval_en", "repobench-p"]
-        else:    
+        else: 
             datasets = ["qasper", "multifieldqa_en", "hotpotqa", "2wikimqa", "gov_report", "multi_news", \
                 "trec", "triviaqa", "samsum", "passage_count", "passage_retrieval_en", "lcc", "repobench-p"]
     else:
         datasets = ["narrativeqa", "qasper", "multifieldqa_en", "multifieldqa_zh", "hotpotqa", "2wikimqa", "musique", \
                     "dureader", "gov_report", "qmsum", "multi_news", "vcsum", "trec", "triviaqa", "samsum", "lsht", \
                     "passage_count", "passage_retrieval_en", "passage_retrieval_zh", "lcc", "repobench-p"]
-    
+
     dataset2prompt = json.load(open("./configs/dataset2prompt.json", "r"))
     dataset2maxlen = json.load(open("./configs/dataset2maxlen.json", "r"))
 
