@@ -1,5 +1,5 @@
 ![image](./figs/logo.jpg?raw=true)
-# <p align=center> Speeding up LLM Inference via Token Importance Transferability
+# <p align=center> Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation
 
 [![Arxiv Paper](https://img.shields.io/badge/Arxiv-Paper-brightred)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
@@ -74,12 +74,12 @@ bash experiments/run_{task_of_interest}.sh
 
 All results will be saved in a local folder called `local`. 
 
+(For another baseline RAG experiments, please checkout branch `rag_baseline`)
+
 ## WIP and Contributing
 We welcome everyone to try and contribute to the code! Here're some planned TODOs
 - [x] Make sure all experiments are reproducible in the paper.
 - [x] Package the repo. 
-- [ ] Fix the problem of non `eager-mode`. 
-- [ ] Enable `chunked-prefill`.
 - [ ] Update to the latest vLLM version. 
 
 Since vLLM is updating very fast, we choose to keep this project as a monkey patch. Integrating into the main vLLM is extremely appreciated!!!
