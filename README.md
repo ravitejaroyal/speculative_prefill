@@ -86,3 +86,14 @@ Since vLLM is updating very fast, we choose to keep this project as a monkey pat
 
 ## Citation
 If you found our work to be useful, please cite our paper: 
+```bib
+@misc{liu2025speculativeprefillturbochargingttft,
+      title={Speculative Prefill: Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation}, 
+      author={Jingyu Liu and Beidi Chen and Ce Zhang},
+      year={2025},
+      eprint={2502.02789},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2502.02789}, 
+}
+```
