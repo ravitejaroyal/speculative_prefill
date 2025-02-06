@@ -1,7 +1,7 @@
 ![image](./figs/logo.jpg?raw=true)
 # <p align=center> Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation
 
-[![Arxiv Paper](https://img.shields.io/badge/Arxiv-Paper-brightred)]()
+[![Arxiv Paper](https://img.shields.io/badge/Arxiv-Paper-brightred)](https://arxiv.org/abs/2502.02789)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen) ![](https://img.shields.io/github/stars/Jingyu6/speculative_prefill?style=social) 
 
