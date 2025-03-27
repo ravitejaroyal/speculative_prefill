@@ -27,7 +27,7 @@ spec_model = os.environ.get(
 if spec_model:
     enable_prefill_spec(
         spec_model=spec_model, 
-        spec_config_path='./local/config.yaml'
+        spec_config_path='./configs/config.yaml'
     )
 
 import uvicorn

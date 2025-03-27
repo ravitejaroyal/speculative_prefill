@@ -155,7 +155,7 @@ if __name__ == '__main__':
         from speculative_prefill.vllm_patch import enable_prefill_spec
         enable_prefill_spec(
             spec_model=args.spec_model, 
-            spec_config_path='./local/config.yaml'
+            spec_config_path='./configs/config.yaml'
         )
 
     main(args)

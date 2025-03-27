@@ -118,7 +118,7 @@ if __name__ == "__main__":
         from speculative_prefill import enable_prefill_spec
         enable_prefill_spec(
             spec_model=args.spec_model, 
-            spec_config_path='./local/config.yaml'
+            spec_config_path='./configs/config.yaml'
         )
 
     if args.minference and args.tensor_parallel_size > 1:
