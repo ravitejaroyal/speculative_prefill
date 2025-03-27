@@ -1,7 +1,7 @@
 cd ./eval/long_bench
 
 python pred_vllm.py \
-    --model "/data/data_persistent1/jingyu/llama_70b" \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --minference \
     --tensor-parallel-size 8 \
     --exp minference

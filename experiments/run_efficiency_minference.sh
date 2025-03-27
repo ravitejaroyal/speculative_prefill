@@ -1,7 +1,7 @@
 OUTPUT_DIR=./local/outputs/efficiency/minference
 
 python eval/minference_latency.py \
-    --model "/data/data_persistent1/jingyu/llama_70b" \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
@@ -13,7 +13,7 @@ python eval/minference_latency.py \
     --num-iters 16 > $OUTPUT_DIR/bs128_sl4096.txt
 
 python eval/minference_latency.py \
-    --model "/data/data_persistent1/jingyu/llama_70b" \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
@@ -25,7 +25,7 @@ python eval/minference_latency.py \
     --num-iters 16 > $OUTPUT_DIR/bs64_sl8192.txt
 
 python eval/minference_latency.py \
-    --model "/data/data_persistent1/jingyu/llama_70b" \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
@@ -37,7 +37,7 @@ python eval/minference_latency.py \
     --num-iters 16 > $OUTPUT_DIR/bs32_sl16384.txt
 
 python eval/minference_latency.py \
-    --model "/data/data_persistent1/jingyu/llama_70b" \
+    --model "meta-llama/Meta-Llama-3.1-70B-Instruct" \
     --enforce-eager \
     --enable-chunked-prefill False \
     --tensor-parallel-size 8 \
