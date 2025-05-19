@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen) ![](https://img.shields.io/github/stars/Jingyu6/speculative_prefill?style=social) 
 
+> 🎉 SpecPrefill got accepted to ICML 2025! Check our lastest version of paper. 
+
 ## About
 _Speculative Prefill_ is a technique for accelerating LLM inference via token importance transferability. Essentially, _Speculative Prefill_ adopts a smaller, usually cheaper, LLM as a "draft" model that speculates what tokens are contextually important. Only these tokens, along with their original position information are then sent to the main model for inference. 
 
