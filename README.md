@@ -41,7 +41,7 @@ pip3 install -r requirements.txt
 ```
 
 ## Example Usage
-We just need to apply the monkey patch before native vLLM code. 
+We just need to apply the monkey patch before native vLLM code.
 ```python
 from speculative_prefill import enable_prefill_spec
 
@@ -60,6 +60,13 @@ llm = LLM(
     enable_chunked_prefill=False, 
     tensor_parallel_size=8
 )
+```
+
+### Standalone HuggingFace Example
+For a lightweight demonstration without vLLM, run `examples/hf_example.py` which
+uses the `HFFSpeculativePrefill` class:
+```bash
+python examples/hf_example.py
 ```
 
 ## Evaluation
