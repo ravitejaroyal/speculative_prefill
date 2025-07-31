@@ -6,6 +6,7 @@ if __name__ == "__main__":
         spec_model="meta-llama/Llama-3.2-1B-Instruct",
         look_ahead=4,
         keep_percentage=0.5,
+        pool_kernel_size=1,
         device="cuda"
     )
     prompt = "Tell me about the city of Chicago."

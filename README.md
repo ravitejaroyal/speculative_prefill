@@ -64,7 +64,8 @@ llm = LLM(
 
 ### Standalone HuggingFace Example
 For a lightweight demonstration without vLLM, run `examples/hf_example.py` which
-uses the `HFFSpeculativePrefill` class:
+uses the `HFFSpeculativePrefill` class. The standalone implementation mirrors
+the vLLM speculative prefill algorithm:
 ```bash
 python examples/hf_example.py
 ```
